@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import CoBrand from "./CoBrand";
 
 export default function AppHeader({
   dealershipName,
@@ -16,11 +17,7 @@ export default function AppHeader({
 
   return (
     <header className="app">
-      <div className="brand">
-        <span>RANGE ROVER</span>
-        <span className="dot" />
-        <span className="secondary">WHITE GLOVE AUTO</span>
-      </div>
+      <CoBrand size="header" />
       <div className="session">
         <span className="pill">{dealershipName.toUpperCase()}</span>
         <button className="signout" onClick={signOut}>

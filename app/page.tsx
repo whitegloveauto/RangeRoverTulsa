@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import CoBrand from "@/components/CoBrand";
 
 // For now the portal serves a single dealership brand (Range Rover · Tulsa).
 // The slug is fixed here; when multiple dealerships exist, this becomes a
@@ -55,7 +56,9 @@ export default function LoginPage() {
     <div className="frame">
       <main>
         <div className="login-stage">
-          <div className="login-eyebrow">RANGE ROVER &nbsp;·&nbsp; WHITE GLOVE AUTO</div>
+          <div style={{ marginBottom: 40 }}>
+            <CoBrand size="login" />
+          </div>
           <h1 className="login-title">
             Dealership
             <br />

@@ -84,7 +84,16 @@ export default function PricingPage() {
   }, [selected, acIndex]);
 
   function toggleTier(tier: string) {
-    setExpandedTier((cur) => (cur === tier ? null : tier));
+    // Clicking a tier selects it into the quote and expands its detail.
+    // Clicking the already-selected tier deselects + collapses it.
+    setSelectedTier((cur) => {
+      if (cur === tier) {
+        setExpandedTier(null);
+        return null;
+      }
+      setExpandedTier(tier);
+      return tier;
+    });
   }
 
   function toggleAc(key: string) {
@@ -209,22 +218,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {savingMsg && (
-            <div
-              style={{
-                marginBottom: 24,
-                padding: "12px 18px",
-                border: "1px solid var(--gold-dim)",
-                background: "rgba(184,153,104,0.08)",
-                color: "var(--gold-bright)",
-                fontSize: 12,
-                letterSpacing: "0.06em",
-              }}
-            >
-              {savingMsg}
-            </div>
-          )}
-
           <div className="section-eyebrow">PROTECTION PACKAGES</div>
 
           {pricing?.packages.map((p) => {
@@ -303,15 +296,27 @@ export default function PricingPage() {
                       </div>
                     </div>
                     <div className="actions">
-                      <button
-                        className={isSelected ? "btn-ghost" : "btn-primary"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTier(isSelected ? null : p.tier);
-                        }}
-                      >
-                        {isSelected ? "Remove from Quote" : "Add to Quote"}
-                      </button>
+                      {isSelected ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            letterSpacing: "0.12em",
+                            color: "var(--gold-bright)",
+                          }}
+                        >
+                          ✓ ADDED TO QUOTE — TAP THE TIER AGAIN TO REMOVE
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            letterSpacing: "0.12em",
+                            color: "var(--text-3)",
+                          }}
+                        >
+                          TAP THIS TIER TO ADD IT TO THE QUOTE
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -485,6 +490,23 @@ export default function PricingPage() {
                 />
               </div>
             </div>
+
+            {savingMsg && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: "14px 18px",
+                  border: "1px solid var(--gold)",
+                  background: "rgba(184,153,104,0.12)",
+                  color: "var(--gold-bright)",
+                  fontSize: 13,
+                  letterSpacing: "0.04em",
+                  textAlign: "center",
+                }}
+              >
+                {savingMsg}
+              </div>
+            )}
 
             {/* Three actions */}
             <div className="db-actions">

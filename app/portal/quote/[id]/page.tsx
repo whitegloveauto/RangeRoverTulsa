@@ -88,11 +88,12 @@ export default function QuoteSheetPage() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          .sheet { box-shadow: none !important; margin: 0 !important; }
+          .sheet { box-shadow: none !important; margin: 0 !important; max-width: 100% !important; }
           body { background: #fff !important; }
           .ambient { display: none !important; }
+          main { padding: 0 !important; }
         }
-        @page { margin: 0.6in; }
+        @page { size: portrait; margin: 0.5in; }
       `}</style>
 
       <div className="frame">
@@ -139,23 +140,17 @@ export default function QuoteSheetPage() {
               }}
             >
               <div>
-                <div
-                  style={{
-                    fontFamily: "'Cormorant Garamond', serif",
-                    fontSize: 26,
-                    fontWeight: 600,
-                    color: "#0C1A14",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  White Glove Auto
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/wga-black.png"
+                  alt="White Glove Auto"
+                  style={{ height: 32, width: "auto", display: "block", marginBottom: 6 }}
+                />
                 <div
                   style={{
                     fontSize: 10,
                     letterSpacing: "0.18em",
                     color: "#8A7752",
-                    marginTop: 4,
                     textTransform: "uppercase",
                   }}
                 >
