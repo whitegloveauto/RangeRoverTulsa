@@ -24,3 +24,7 @@ The old `dealer_packages` / `dealer_alacarte_catalog` tables are left in place b
 - Dealer admin (temporary): `admin@rangerovertulsa.local` / `RangeRover-Admin-2026` — change it in Settings → Team logins,
   or add the real managers under WGA → Dealerships and disable this one.
 - WGA side: any `profiles` admin, or a team member with Dealer Deals access.
+
+## v2.1 — ShopMonkey + Vehicles
+- Submitting an order now creates the ShopMonkey RO automatically (edge function `dealer-order-sm`); RO # shows on the dealer confirmation, in the push alert title, and in /wga/orders (with a "Create RO now" retry if it failed).
+- New WGA admin tab /wga/vehicles: add model years (copy previous year), add/rename/hide models, add/hide/delete trims.

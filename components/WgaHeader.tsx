@@ -18,6 +18,7 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
     ...(role === "admin"
       ? [
           { href: "/wga/pricing", label: "Pricing" },
+          { href: "/wga/vehicles", label: "Vehicles" },
           { href: "/wga/dealerships", label: "Dealerships" },
         ]
       : []),

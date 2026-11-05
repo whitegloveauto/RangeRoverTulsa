@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import { loadPricingBook } from "@/lib/pricingBook";
 import { notifyWga } from "@/lib/notify";
+import { createShopMonkeyTicket } from "@/lib/shopmonkey";
 import type { OrderLine } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -107,11 +108,14 @@ export async function POST(req: Request) {
       actor_name: session.userName,
       detail: `Submitted by ${session.userName} (${session.name})`,
     });
+    // ShopMonkey ticket first so the push can carry the RO number.
+    const sm = await createShopMonkeyTicket(data.id);
     await notifyWga(
-      "New Range Rover order",
+      sm.ok && sm.number ? `New Range Rover order · RO ${sm.number}` : "New Range Rover order",
       `${session.name}: ${vehicleYear} ${vehicleModel} ${vehicleTrim} — ${lines.map((l) => l.name).join(", ")} · $${costTotal.toLocaleString("en-US")}`,
-      { quote_id: data.id, quote_number: data.quote_number }
+      { quote_id: data.id, quote_number: data.quote_number, sm_order_number: sm.number ?? null }
     );
+    return NextResponse.json({ ok: true, quote: { ...data, sm_order_number: sm.number ?? null }, submitted: true });
   }
   return NextResponse.json({ ok: true, quote: data, submitted: isSubmit });
 }

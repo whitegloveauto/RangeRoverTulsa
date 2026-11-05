@@ -91,7 +91,7 @@ export default function PricingPage() {
       return;
     }
     if (submit) {
-      setMsg({ text: `Order ${data.quote.quote_number} sent to White Glove Auto.` });
+      setMsg({ text: `Order ${data.quote.quote_number} sent to White Glove Auto${data.quote.sm_order_number ? ` — ticket RO ${data.quote.sm_order_number} opened` : ""}.` });
       router.push(`/portal/quote/${data.quote.id}`);
     } else {
       setMsg({ text: `Quote ${data.quote.quote_number} saved.` });

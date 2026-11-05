@@ -58,10 +58,10 @@ export default function WgaOrdersPage() {
           <div className="tbl-wrap">
             <table className="tbl">
               <thead>
-                <tr><th>Submitted</th><th>Quote #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
+                <tr><th>Submitted</th><th>Quote #</th><th>RO #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={9} style={{ textAlign: "center", padding: 28 }}>Nothing here.</td></tr> : null}
+                {rows.length === 0 ? <tr><td colSpan={10} style={{ textAlign: "center", padding: 28 }}>Nothing here.</td></tr> : null}
                 {rows.map((o) => (
                   <OrderRow key={o.id} o={o} open={open === o.id} onToggle={() => setOpen(open === o.id ? null : o.id)} onPatch={(b) => patch(o.id, b)} />
                 ))}
@@ -82,6 +82,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
       <tr onClick={onToggle} style={{ cursor: "pointer" }}>
         <td>{new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })}<br /><span style={{ fontSize: 11 }}>{new Date(when).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></td>
         <td><b>{o.quote_number}</b></td>
+        <td>{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span className="status-pill cancelled" title={o.sm_sync_error}>SM failed</span> : <span style={{ color: "var(--text-3)" }}>—</span>}</td>
         <td>{o.dealer_dealerships?.name || "—"}<br /><span style={{ fontSize: 11 }}>{o.dealer_user_name || ""}</span></td>
         <td><b>{o.vehicle_year} {o.vehicle_model}</b><br /><span style={{ fontSize: 11, color: "var(--gold-bright)" }}>{o.vehicle_trim}</span></td>
         <td>{lines.map((l) => l.name).join(", ")}</td>
@@ -92,7 +93,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
       </tr>
       {open ? (
         <tr className="detail-row">
-          <td colSpan={9}>
+          <td colSpan={10}>
             <div className="detail-lines">
               <span className="h">Line item</span><span className="h r">WGA bills</span><span className="h r">Dealer retail</span>
               {lines.map((l, i) => (
@@ -108,6 +109,13 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
               {o.stock_number ? <span>Stock <b>{o.stock_number}</b></span> : null}
               {o.customer_name ? <span>Customer <b>{o.customer_name}</b>{o.customer_phone ? ` · ${o.customer_phone}` : ""}</span> : null}
               {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
+              {o.sm_order_number ? <span>ShopMonkey <b>RO {o.sm_order_number}</b>{o.sm_synced_at ? ` · ${new Date(o.sm_synced_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
+              {!o.sm_order_number ? (
+                <span onClick={(e) => e.stopPropagation()}>
+                  ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b>{" "}
+                  <button className="link-btn" onClick={() => onPatch({ action: "shopmonkey" })}>Create RO now</button>
+                </span>
+              ) : null}
             </div>
             <div className="detail-actions" onClick={(e) => e.stopPropagation()}>
               <div className="field"><label>Status</label>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWgaSession } from "@/lib/session";
+import { createShopMonkeyTicket } from "@/lib/shopmonkey";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
   let q = supabaseAdmin
     .from("dealer_quotes")
     .select(
-      "id, quote_number, dealership_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, customer_phone, customer_email, line_items, package_snapshot, alacarte_items, retail_total, cost_total, gross_total, status, notes, internal_notes, assigned_name, scheduled_date, submitted_at, status_updated_at, created_at, dealer_user_name, dealer_dealerships(name)"
+      "id, quote_number, dealership_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, customer_phone, customer_email, line_items, package_snapshot, alacarte_items, retail_total, cost_total, gross_total, status, notes, internal_notes, assigned_name, scheduled_date, submitted_at, status_updated_at, created_at, dealer_user_name, sm_order_id, sm_order_number, sm_synced_at, sm_sync_error, dealer_dealerships(name)"
     )
     .neq("status", "draft")
     .order("submitted_at", { ascending: false, nullsFirst: false })
@@ -38,6 +39,13 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (!b.id) return NextResponse.json({ error: "Missing id." }, { status: 400 });
+
+  // { id, action: "shopmonkey" } — (re)create the ShopMonkey RO for this order
+  if (b.action === "shopmonkey") {
+    const r = await createShopMonkeyTicket(b.id);
+    if (!r.ok) return NextResponse.json({ error: `ShopMonkey: ${r.error}` }, { status: 502 });
+    return NextResponse.json({ ok: true, sm_order_number: r.number });
+  }
 
   const { data: cur } = await supabaseAdmin.from("dealer_quotes").select("status").eq("id", b.id).single();
   const patch: any = {};
