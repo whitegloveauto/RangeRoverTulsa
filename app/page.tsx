@@ -4,18 +4,16 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CoBrand from "@/components/CoBrand";
 
-// For now the portal serves a single dealership brand (Range Rover · Tulsa).
-// The slug is fixed here; when multiple dealerships exist, this becomes a
-// subdomain or path param that selects the slug.
+// Single dealership for now; becomes a subdomain/slug lookup when more are added.
 const DEALERSHIP_SLUG = "range-rover-tulsa";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // If already authenticated, skip straight to the portal.
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => (r.ok ? r.json() : null))
@@ -28,7 +26,7 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!password.trim()) {
-      setError("Enter the dealership password to continue.");
+      setError("Enter your password to continue.");
       return;
     }
     setBusy(true);
@@ -37,7 +35,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: DEALERSHIP_SLUG, password }),
+        body: JSON.stringify({ slug: DEALERSHIP_SLUG, email: email.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -45,7 +43,7 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      router.push("/portal/vehicle");
+      router.push(data.mustChangePassword ? "/portal/password?first=1" : "/portal/vehicle");
     } catch {
       setError("Network error. Try again.");
       setBusy(false);
@@ -65,22 +63,17 @@ export default function LoginPage() {
             Pricing Portal.
           </h1>
           <p className="login-sub">
-            Authorized access to vehicle-specific paint protection film, ceramic
-            coating, and window film pricing — built directly into the XPEL
-            Design Access Program.
+            Vehicle-specific pricing for paint protection film, ceramic coating, window tint, and windshield protection — installed by White Glove Auto.
           </p>
 
           <form className="login-form" onSubmit={handleLogin}>
             <div className="field">
-              <label htmlFor="dealer-pw">Dealership Password</label>
-              <input
-                id="dealer-pw"
-                type="password"
-                placeholder="Enter shared dealership password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <label htmlFor="dealer-email">Email</label>
+              <input id="dealer-email" type="email" placeholder="you@dealership.com" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="dealer-pw">Password</label>
+              <input id="dealer-pw" type="password" placeholder="Your password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
               <div className="login-err">{error}</div>
             </div>
             <button className="btn-primary" type="submit" disabled={busy}>

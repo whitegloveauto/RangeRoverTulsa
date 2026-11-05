@@ -1,4 +1,4 @@
-// Types that mirror the Supabase schema (0001_dealer_portal_init.sql).
+// Types that mirror the Supabase schema (dealer program v2).
 
 export interface Dealership {
   id: string;
@@ -8,35 +8,42 @@ export interface Dealership {
   location: string | null;
   billing_terms: number;
   active: boolean;
+  hide_cost_from_users: boolean;
 }
 
-export interface PackageItem {
-  name: string;
-  retail: number;
-  cost: number;
-}
-
-export interface ProtectionPackage {
+export interface DealerService {
   id: string;
   brand: string;
-  tier: string; // ESSENTIAL / SIGNATURE / ESTATE / ROYAL
-  tier_order: number;
-  tier_index: string; // I / II / III / IV
-  items: PackageItem[];
-  retail_total: number;
-  cost_total: number;
-  gross_total: number;
+  key: string;
+  name: string;
+  note: string | null;
+  sort_order: number;
+  active: boolean;
 }
 
-export interface AlacarteItem {
+export interface DealerServiceItem {
   id: string;
-  item_key: string;
-  group_label: string;
-  group_order: number;
-  item_order: number;
+  service_id: string;
   name: string;
-  retail: number;
-  cost: number;
+  description: string | null;
+  sort_order: number;
+  active: boolean;
+}
+
+// One cell of the pricing grid for a given model + item.
+export interface ModelPrice {
+  cost: number | null; // what WGA charges the dealership (null = not priced yet)
+  suggested_retail: number | null;
+  retail: number | null; // the dealership's own customer price (falls back to suggested)
+}
+
+// Fully assembled pricing for one dealership, keyed by model then item id.
+export interface PricingBook {
+  brand: string;
+  models: string[];
+  services: (DealerService & { items: DealerServiceItem[] })[];
+  prices: Record<string, Record<string, ModelPrice>>;
+  canSeeCost: boolean;
 }
 
 export interface VehicleCatalog {
@@ -45,18 +52,37 @@ export interface VehicleCatalog {
   byYear: Record<number, Record<string, string[]>>;
 }
 
-// The session payload encoded into the JWT.
-export interface SessionClaims {
-  dealershipId: string;
-  slug: string;
+// Quote / order line item (snapshot at time of order)
+export interface OrderLine {
+  item_id: string;
+  service: string;
   name: string;
-  brand: string;
-  location: string | null;
+  cost: number;
+  retail: number;
 }
 
-// Shape returned by /api/pricing
-export interface PricingResponse {
-  packages: ProtectionPackage[];
-  alacarte: AlacarteItem[];
-  tintUpgrade: { retail: number; cost: number };
+export interface DealerUser {
+  id: string;
+  dealership_id: string;
+  email: string;
+  name: string;
+  role: "admin" | "user";
+  active: boolean;
+  must_change_password: boolean;
+  last_login_at: string | null;
+}
+
+// The session payload encoded into the JWT.
+export interface SessionClaims {
+  kind: "dealer" | "wga";
+  dealershipId: string; // "" for wga sessions
+  slug: string;
+  name: string; // dealership name (dealer) or "White Glove Auto" (wga)
+  brand: string;
+  location: string | null;
+  userId: string | null;
+  userName: string;
+  userEmail: string;
+  role: "admin" | "user"; // dealer admin/user, or wga admin/user(team)
+  canSeeCost: boolean;
 }

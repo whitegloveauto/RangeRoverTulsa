@@ -19,6 +19,7 @@ interface QuoteData {
   package_snapshot: any;
   tint_upgrade: boolean;
   alacarte_items: any[];
+  line_items: { service: string; name: string; retail: number }[];
   retail_total: number;
   status: string;
   created_at: string;
@@ -81,6 +82,9 @@ export default function QuoteSheetPage() {
   const packageItems: { name: string; retail: number }[] =
     quote.package_snapshot?.items || [];
   const alacarte: { name: string; retail: number }[] = quote.alacarte_items || [];
+  const lines = quote.line_items || [];
+  const byService: Record<string, { name: string; retail: number }[]> = {};
+  for (const l of lines) (byService[l.service] = byService[l.service] || []).push(l);
 
   return (
     <>
@@ -199,7 +203,7 @@ export default function QuoteSheetPage() {
                   color: "#0C1A14",
                 }}
               >
-                Protection Quote
+                {quote.status === "draft" ? "Protection Quote" : "Protection Order"}
               </div>
               <div style={{ textAlign: "right", fontSize: 11, color: "#555" }}>
                 <div>
@@ -247,6 +251,19 @@ export default function QuoteSheetPage() {
                 {quote.customer_name && <span>Customer: {quote.customer_name}</span>}
               </div>
             </div>
+
+            {/* Services (v2 orders) */}
+            {Object.entries(byService).map(([svc, items]) => (
+              <div key={svc} style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.2em", color: "#0C1A14", fontWeight: 700, textTransform: "uppercase", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid #ddd" }}>{svc}</div>
+                {items.map((it, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 13, color: "#333" }}>
+                    <span>{it.name}</span>
+                    <span style={{ color: "#0C1A14" }}>{fmt(it.retail)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
 
             {/* Package section */}
             {quote.package_tier && (
@@ -381,7 +398,7 @@ export default function QuoteSheetPage() {
               All paint protection film installed using XPEL Ultimate Plus 10 with
               manufacturer warranty. Window tint includes lifetime warranty.
               <br />
-              White Glove Auto · Glenpool, Oklahoma · This quote is valid for 30
+              White Glove Auto · Tulsa, Oklahoma · This quote is valid for 30
               days from the date above.
             </div>
           </div>

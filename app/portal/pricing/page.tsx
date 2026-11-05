@@ -2,39 +2,27 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { getSelectedVehicle } from "@/lib/vehicleStore";
-import type {
-  PricingResponse,
-  ProtectionPackage,
-  AlacarteItem,
-} from "@/lib/types";
+import { useDealerSession } from "@/lib/useDealerSession";
+import type { PricingBook } from "@/lib/types";
 
-function fmt(n: number) {
-  return "$" + n.toLocaleString("en-US");
-}
+const money = (n: number | null | undefined) => (n === null || n === undefined ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }));
 
 export default function PricingPage() {
   const router = useRouter();
-  const [dealershipName, setDealershipName] = useState("");
-  const [vehicle, setVehicle] = useState<{
-    year: number;
-    model: string;
-    trim: string;
-  } | null>(null);
-  const [pricing, setPricing] = useState<PricingResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const [expandedTier, setExpandedTier] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const { session, ready } = useDealerSession();
+  const [vehicle, setVehicle] = useState<{ year: number; model: string; trim: string } | null>(null);
+  const [book, setBook] = useState<PricingBook | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [savingMsg, setSavingMsg] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  // Customer / deal detail (all optional for a quote; helpful on an order)
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [stockNumber, setStockNumber] = useState("");
   const [vin, setVin] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; err?: boolean }>({ text: "" });
 
   useEffect(() => {
     const v = getSelectedVehicle();
@@ -43,95 +31,43 @@ export default function PricingPage() {
       return;
     }
     setVehicle(v);
-
-    (async () => {
-      const sessRes = await fetch("/api/auth/session");
-      if (!sessRes.ok) {
-        router.replace("/");
-        return;
-      }
-      const sess = await sessRes.json();
-      setDealershipName(sess.dealership.name);
-
-      const priceRes = await fetch("/api/pricing");
-      if (priceRes.ok) {
-        setPricing(await priceRes.json());
-      }
-      setLoading(false);
-    })();
   }, [router]);
 
-  const acIndex = useMemo(() => {
-    const idx: Record<string, AlacarteItem> = {};
-    pricing?.alacarte.forEach((a) => (idx[a.item_key] = a));
-    return idx;
-  }, [pricing]);
+  useEffect(() => {
+    if (!ready) return;
+    fetch("/api/pricing").then(async (r) => r.ok && setBook(await r.json()));
+  }, [ready]);
 
-  const acGroups = useMemo(() => {
-    const groups: Record<string, AlacarteItem[]> = {};
-    pricing?.alacarte.forEach((a) => {
-      if (!groups[a.group_label]) groups[a.group_label] = [];
-      groups[a.group_label].push(a);
-    });
-    return groups;
-  }, [pricing]);
+  const prices = useMemo(() => (book && vehicle ? book.prices[vehicle.model] || {} : {}), [book, vehicle]);
 
   const totals = useMemo(() => {
-    const items = Array.from(selected).map((k) => acIndex[k]).filter(Boolean);
-    const retail = items.reduce((s, i) => s + i.retail, 0);
-    const cost = items.reduce((s, i) => s + i.cost, 0);
-    return { retail, cost, gross: retail - cost, count: items.length };
-  }, [selected, acIndex]);
+    let retail = 0,
+      cost = 0,
+      count = 0;
+    for (const id of Array.from(selected)) {
+      const c = prices[id];
+      if (!c) continue;
+      retail += c.retail ?? 0;
+      cost += c.cost ?? 0;
+      count++;
+    }
+    return { retail, cost, count };
+  }, [selected, prices]);
 
-  function toggleTier(tier: string) {
-    // Clicking a tier selects it into the quote and expands its detail.
-    // Clicking the already-selected tier deselects + collapses it.
-    setSelectedTier((cur) => {
-      if (cur === tier) {
-        setExpandedTier(null);
-        return null;
-      }
-      setExpandedTier(tier);
-      return tier;
-    });
-  }
-
-  function toggleAc(key: string) {
+  function toggle(id: string) {
+    const c = prices[id];
+    if (!c || c.retail === null) return;
     setSelected((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+      const n = new Set(cur);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
     });
   }
 
-  // Combined quote = selected package (optional) + selected à la carte panels (optional)
-  const selectedPackage = useMemo(
-    () => pricing?.packages.find((p) => p.tier === selectedTier) || null,
-    [pricing, selectedTier]
-  );
-
-  const combinedTotals = useMemo(() => {
-    const pkgRetail = selectedPackage?.retail_total || 0;
-    const pkgCost = selectedPackage?.cost_total || 0;
-    return {
-      retail: pkgRetail + totals.retail,
-      cost: pkgCost + totals.cost,
-      gross: pkgRetail + totals.retail - (pkgCost + totals.cost),
-      hasAnything: !!selectedPackage || totals.count > 0,
-    };
-  }, [selectedPackage, totals]);
-
-  // mode: 'draft' | 'print' | 'submit'
-  async function buildQuote(mode: "draft" | "print" | "submit") {
-    if (!vehicle || !combinedTotals.hasAnything) return;
+  async function save(submit: boolean) {
+    if (!vehicle || !selected.size) return;
     setBusy(true);
-    setSavingMsg(
-      mode === "submit" ? "Submitting order…" : "Saving…"
-    );
-
-    const alacarteSelected = Array.from(selected).map((k) => acIndex[k]);
-
+    setMsg({ text: "" });
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -139,44 +75,31 @@ export default function PricingPage() {
         vehicleYear: vehicle.year,
         vehicleModel: vehicle.model,
         vehicleTrim: vehicle.trim,
-        vehicleVin: vin || null,
-        packageTier: selectedPackage?.tier || null,
-        packageSnapshot: selectedPackage || null,
-        alacarteItems: alacarteSelected,
-        retailTotal: combinedTotals.retail,
-        costTotal: combinedTotals.cost,
-        grossTotal: combinedTotals.gross,
-        customerName: customerName || null,
-        stockNumber: stockNumber || null,
-        submit: mode === "submit",
+        vehicleVin: vin,
+        stockNumber,
+        customerName,
+        customerPhone,
+        notes,
+        itemIds: Array.from(selected),
+        submit,
       }),
     });
-
     const data = await res.json();
     setBusy(false);
-
     if (!res.ok) {
-      setSavingMsg(data.error || "Save failed.");
-      setTimeout(() => setSavingMsg(""), 4000);
+      setMsg({ text: data.error || "Could not save.", err: true });
       return;
     }
-
-    if (mode === "print") {
+    if (submit) {
+      setMsg({ text: `Order ${data.quote.quote_number} sent to White Glove Auto.` });
       router.push(`/portal/quote/${data.quote.id}`);
-      return;
-    }
-
-    if (mode === "submit") {
-      setSavingMsg(
-        `Order submitted · ${data.quote.quote_number} — sent to White Glove Auto`
-      );
     } else {
-      setSavingMsg(`Draft saved · ${data.quote.quote_number}`);
+      setMsg({ text: `Quote ${data.quote.quote_number} saved.` });
+      router.push(`/portal/quote/${data.quote.id}`);
     }
-    setTimeout(() => setSavingMsg(""), 5000);
   }
 
-  if (loading || !vehicle) {
+  if (!ready || !session || !vehicle || !book) {
     return (
       <div className="frame">
         <main>
@@ -188,370 +111,108 @@ export default function PricingPage() {
     );
   }
 
+  const sheetHref = `/portal/sheet?model=${encodeURIComponent(vehicle.model)}&year=${vehicle.year}&trim=${encodeURIComponent(vehicle.trim)}`;
+
   return (
     <div className="frame">
-      <AppHeader dealershipName={dealershipName} />
+      <AppHeader dealershipName={session.dealership.name} role={session.user.role} userName={session.user.name} />
       <main>
-        <nav className="step-rail">
-          <div className="step done">
-            <span className="num">1</span> Vehicle Selected
-          </div>
-          <div className="step active">
-            <span className="num">2</span> Review Pricing
-          </div>
-          <div className="step">
-            <span className="num">3</span> Generate Quote
-          </div>
-        </nav>
+        <div className="step-rail">
+          <div className="step done"><span className="num">1</span> Vehicle</div>
+          <div className="step active"><span className="num">2</span> Pricing</div>
+          <div className="step"><span className="num">3</span> Order</div>
+        </div>
 
-        <section className="stage">
-          {/* Nameplate */}
-          <div className="nameplate">
-            <div className="meta">VEHICLE CONFIGURED</div>
-            <div className="year-model">
-              {vehicle.year} {vehicle.model}
+        <div className="stage">
+          <div className="nameplate" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
+            <div>
+              <div className="meta">{session.dealership.brand.toUpperCase()} · {vehicle.year}</div>
+              <div className="year-model">{vehicle.model}</div>
+              <div className="trim">{vehicle.trim}</div>
             </div>
-            <div className="trim">{vehicle.trim}</div>
-            <div className="vin">
-              PROGRAM PRICING &nbsp;·&nbsp; FIXED RATE ACROSS ALL RANGE ROVER
-              VEHICLES
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Link href={sheetHref} className="btn-ghost btn-sm" style={{ display: "inline-block" }}>
+                Print price sheet
+              </Link>
+              <button className="reset" onClick={() => router.push("/portal/vehicle")}>CHANGE VEHICLE</button>
             </div>
           </div>
 
-          <div className="section-eyebrow">PROTECTION PACKAGES</div>
-
-          {pricing?.packages.map((p) => {
-            const expanded = expandedTier === p.tier;
-            const isSelected = selectedTier === p.tier;
-            return (
-              <div
-                key={p.id}
-                className={`package${expanded || isSelected ? " selected" : ""}`}
-                onClick={() => toggleTier(p.tier)}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="pkg-tier">
-                  <span className="index">{p.tier_index}</span>
-                  {p.tier}
-                  {isSelected && (
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        fontSize: 9,
-                        letterSpacing: "0.18em",
-                        color: "var(--gold-bright)",
-                      }}
-                    >
-                      ✓ SELECTED
-                    </span>
-                  )}
-                </div>
-                <div className="pkg-includes">
-                  {p.items.map((it, i) => (
-                    <div className="line" key={i}>
-                      {it.name}
-                    </div>
-                  ))}
-                </div>
-                <div className="pkg-price">
-                  <div className="amount">{fmt(p.retail_total)}</div>
-                  <div className="label">F&amp;I Retail</div>
-                  <div className="cost">
-                    Dealer cost <b>{fmt(p.cost_total)}</b> &nbsp;·&nbsp; Gross{" "}
-                    <b>{fmt(p.gross_total)}</b>
-                  </div>
-                </div>
-
-                {expanded && (
-                  <div className="pkg-detail">
-                    <div
-                      style={{
-                        marginBottom: 14,
-                        fontSize: 10,
-                        letterSpacing: "0.22em",
-                        color: "var(--gold)",
-                      }}
-                    >
-                      LINE-ITEM DETAIL
-                    </div>
-                    {p.items.map((it, i) => (
-                      <div className="row" key={i}>
-                        <span className="name">{it.name}</span>
-                        <span className="num">{fmt(it.retail)}</span>
-                      </div>
-                    ))}
-                    <div className="totals">
-                      <div className="cell">
-                        <div className="lbl">F&amp;I Retail</div>
-                        <div className="val">{fmt(p.retail_total)}</div>
-                      </div>
-                      <div className="cell">
-                        <div className="lbl">Dealer Cost</div>
-                        <div className="val">{fmt(p.cost_total)}</div>
-                      </div>
-                      <div className="cell gross">
-                        <div className="lbl">Gross Profit</div>
-                        <div className="val">{fmt(p.gross_total)}</div>
-                      </div>
-                    </div>
-                    <div className="actions">
-                      {isSelected ? (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            letterSpacing: "0.12em",
-                            color: "var(--gold-bright)",
-                          }}
-                        >
-                          ✓ ADDED TO QUOTE — TAP THE TIER AGAIN TO REMOVE
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            letterSpacing: "0.12em",
-                            color: "var(--text-3)",
-                          }}
-                        >
-                          TAP THIS TIER TO ADD IT TO THE QUOTE
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
+          {book.services.map((svc) => (
+            <div key={svc.id} className="svc-block">
+              <div className="svc-head">
+                <div className="svc-title">{svc.name}</div>
+                {svc.note ? <div className="svc-note">{svc.note}</div> : null}
               </div>
-            );
-          })}
-
-          {/* Tint upgrade strip */}
-          {pricing?.tintUpgrade && (
-            <div className="upgrade-strip">
-              <div className="left">
-                <b>Optional Upgrade</b> &nbsp;·&nbsp; Extend tint coverage from
-                2-door to full vehicle (any tier)
-              </div>
-              <div className="right">
-                + {fmt(pricing.tintUpgrade.retail)} retail
-              </div>
-            </div>
-          )}
-
-          {/* À la carte */}
-          <div className="alacarte">
-            <div className="alacarte-head">
-              <div
-                className="section-eyebrow"
-                style={{ marginBottom: 14 }}
-              >
-                À LA CARTE COVERAGE
-              </div>
-              <h3 className="alacarte-title">Custom protection. Exact pricing.</h3>
-              <p className="alacarte-sub">
-                For coverage outside the standard packages — individual panels,
-                custom configurations, or specialty installations — select
-                per-panel options priced direct from the XPEL Design Access
-                Program.
-              </p>
-            </div>
-
-            <div className="alacarte-vehicle">
-              <div className="av-left">
-                <span className="av-for">FOR</span>
-                <span className="av-name">
-                  {vehicle.year} {vehicle.model} {vehicle.trim}
-                </span>
-              </div>
-              <div className="av-source">
-                XPEL DAP &nbsp;·&nbsp; 8 MIL ULTIMATE PLUS 10
-              </div>
-            </div>
-
-            {Object.entries(acGroups).map(([group, items]) => (
-              <div className="ac-group" key={group}>
-                <div className="ac-group-label">{group}</div>
-                {items.map((it) => (
-                  <div
-                    key={it.item_key}
-                    className={`ac-panel${
-                      selected.has(it.item_key) ? " selected" : ""
-                    }`}
-                    onClick={() => toggleAc(it.item_key)}
-                  >
-                    <div className="ac-check" />
-                    <div className="ac-name">{it.name}</div>
-                    <div className="ac-price">{fmt(it.retail)}</div>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            <div className="ac-totals">
-              <div className="ac-totals-summary">
-                <div className="ac-eyebrow">À LA CARTE SELECTIONS</div>
-                <div className="ac-count">
-                  {totals.count === 0
-                    ? "No panels selected"
-                    : totals.count === 1
-                    ? "1 panel selected"
-                    : `${totals.count} panels selected`}
-                </div>
-              </div>
-              <div className="ac-totals-amount">
-                <div className="ac-amount">{fmt(totals.retail)}</div>
-                <div className="ac-meta">
-                  <span>Dealer cost {fmt(totals.cost)}</span>
-                  <span className="dim">·</span>
-                  <span>Gross {fmt(totals.gross)}</span>
-                </div>
-              </div>
-              <div className="ac-totals-actions">
-                <span style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.04em" }}>
-                  Added to quote below
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* ============ DEAL BUILDER / ACTION BAR ============ */}
-          <div className="deal-builder">
-            <div className="db-head">
-              <div className="section-eyebrow" style={{ marginBottom: 14 }}>
-                FINALIZE
-              </div>
-              <h3 className="alacarte-title">Build the deal.</h3>
-            </div>
-
-            {/* Current quote summary */}
-            <div className="db-summary">
-              {selectedPackage && (
-                <div className="db-line">
-                  <span className="db-line-name">
-                    {selectedPackage.tier} Package
-                  </span>
-                  <span className="db-line-amt">
-                    {fmt(selectedPackage.retail_total)}
-                  </span>
-                </div>
-              )}
-              {Array.from(selected).map((k) => {
-                const it = acIndex[k];
-                if (!it) return null;
+              {svc.items.length === 0 ? <div style={{ padding: "14px 24px", fontSize: 12, color: "var(--text-3)" }}>No packages yet.</div> : null}
+              {svc.items.map((it) => {
+                const c = prices[it.id];
+                const unpriced = !c || c.retail === null;
+                const on = selected.has(it.id);
                 return (
-                  <div className="db-line" key={k}>
-                    <span className="db-line-name">{it.name}</span>
-                    <span className="db-line-amt">{fmt(it.retail)}</span>
+                  <div key={it.id} className={"svc-item" + (on ? " selected" : "") + (unpriced ? " unpriced" : "")} onClick={() => toggle(it.id)} role="checkbox" aria-checked={on}>
+                    <div className={"ac-check"} style={on ? { borderColor: "var(--gold)", background: "var(--gold)" } : undefined} />
+                    <div className="nm">
+                      {it.name}
+                      {it.description ? <small>{it.description}</small> : null}
+                      {unpriced ? <small>Not priced for this model yet</small> : null}
+                    </div>
+                    <div className="pr">
+                      <div className="retail">{money(c?.retail)}</div>
+                      {book.canSeeCost && c && c.cost !== null ? (
+                        <div className="cost">
+                          cost <b>{money(c.cost)}</b> · margin <b>{money((c.retail ?? 0) - c.cost)}</b>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
-              {!combinedTotals.hasAnything && (
-                <div className="db-empty">
-                  Select a package above or add à la carte panels to build a quote.
-                </div>
-              )}
-              {combinedTotals.hasAnything && (
-                <div className="db-total">
-                  <span>TOTAL</span>
-                  <span className="db-total-amt">{fmt(combinedTotals.retail)}</span>
-                </div>
-              )}
             </div>
+          ))}
 
-            {/* Optional customer detail */}
+          <div className="deal-builder">
+            <div className="db-head">
+              <div className="section-eyebrow">ORDER</div>
+              <div className="alacarte-title">Build the order</div>
+            </div>
+            <div className="db-summary">
+              {totals.count === 0 ? <div className="db-empty">Select the services above to add them to this order.</div> : null}
+              {Array.from(selected).map((id) => {
+                const it = book.services.flatMap((s) => s.items).find((i) => i.id === id);
+                const c = prices[id];
+                return it ? (
+                  <div key={id} className="db-line">
+                    <span className="db-line-name">{it.name}</span>
+                    <span className="db-line-amt">{money(c?.retail)}</span>
+                  </div>
+                ) : null;
+              })}
+              <div className="db-total">
+                <span>TOTAL{book.canSeeCost && totals.count ? ` · YOUR COST ${money(totals.cost)}` : ""}</span>
+                <span className="db-total-amt">{money(totals.retail)}</span>
+              </div>
+            </div>
             <div className="db-fields">
-              <div className="field">
-                <label htmlFor="cust">Customer Name <span style={{color:"var(--text-3)"}}>(optional)</span></label>
-                <input
-                  id="cust"
-                  type="text"
-                  placeholder="e.g. John Smith"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="stock">Stock # <span style={{color:"var(--text-3)"}}>(optional)</span></label>
-                <input
-                  id="stock"
-                  type="text"
-                  placeholder="e.g. RR2451"
-                  value={stockNumber}
-                  onChange={(e) => setStockNumber(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="vin">VIN <span style={{color:"var(--text-3)"}}>(optional)</span></label>
-                <input
-                  id="vin"
-                  type="text"
-                  placeholder="Last 8 or full VIN"
-                  value={vin}
-                  onChange={(e) => setVin(e.target.value)}
-                />
-              </div>
+              <div className="field"><label htmlFor="cust">Customer name</label><input id="cust" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Optional for a quote" /></div>
+              <div className="field"><label htmlFor="phone">Customer phone</label><input id="phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" /></div>
+              <div className="field"><label htmlFor="stock">Stock #</label><input id="stock" value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} /></div>
+              <div className="field"><label htmlFor="vin">VIN</label><input id="vin" value={vin} onChange={(e) => setVin(e.target.value)} placeholder="17 characters" /></div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="notes">Notes for White Glove Auto</label><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Delivery date, special requests…" /></div>
             </div>
-
-            {savingMsg && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  padding: "14px 18px",
-                  border: "1px solid var(--gold)",
-                  background: "rgba(184,153,104,0.12)",
-                  color: "var(--gold-bright)",
-                  fontSize: 13,
-                  letterSpacing: "0.04em",
-                  textAlign: "center",
-                }}
-              >
-                {savingMsg}
-              </div>
-            )}
-
-            {/* Three actions */}
             <div className="db-actions">
-              <button
-                className="btn-ghost"
-                disabled={!combinedTotals.hasAnything || busy}
-                onClick={() => buildQuote("draft")}
-              >
-                Save Draft
-              </button>
-              <button
-                className="btn-ghost"
-                disabled={!combinedTotals.hasAnything || busy}
-                onClick={() => buildQuote("print")}
-              >
-                Save &amp; Print
-              </button>
-              <button
-                className="btn-primary"
-                disabled={!combinedTotals.hasAnything || busy}
-                onClick={() => buildQuote("submit")}
-              >
-                Submit Order
-              </button>
+              <button className="btn-ghost" disabled={busy || !totals.count} onClick={() => save(false)}>Save quote</button>
+              <button className="btn-primary" disabled={busy || !totals.count} onClick={() => save(true)}>{busy ? "Sending…" : "Submit order"}</button>
             </div>
-            <div className="db-note">
-              <b>Save Draft</b> keeps it for later · <b>Save &amp; Print</b> opens a
-              branded quote sheet to print or save as PDF · <b>Submit Order</b> sends
-              the deal to White Glove Auto to begin work.
+            <div className="db-note" style={{ color: msg.err ? "var(--warn)" : undefined }}>
+              {msg.text || (
+                <>
+                  <b>Save quote</b> keeps it for later. <b>Submit order</b> sends the vehicle and selected services to White Glove Auto for scheduling.
+                </>
+              )}
             </div>
           </div>
-
-          <div className="footer-line">
-            <button
-              className="reset"
-              onClick={() => router.push("/portal/vehicle")}
-            >
-              ← BACK TO VEHICLE SELECT
-            </button>
-            <span>
-              RANGE ROVER · TULSA &nbsp;·&nbsp; WHITE GLOVE AUTO DEALERSHIP
-              PORTAL
-            </span>
-          </div>
-        </section>
+        </div>
       </main>
     </div>
   );

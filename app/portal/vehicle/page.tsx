@@ -9,6 +9,7 @@ import type { VehicleCatalog } from "@/lib/types";
 export default function VehiclePage() {
   const router = useRouter();
   const [dealershipName, setDealershipName] = useState("");
+  const [who, setWho] = useState<{ name: string; role: "admin" | "user" } | null>(null);
   const [catalog, setCatalog] = useState<VehicleCatalog | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +27,7 @@ export default function VehiclePage() {
       }
       const sess = await sessRes.json();
       setDealershipName(sess.dealership.name);
+      setWho(sess.user || null);
 
       const vehRes = await fetch("/api/vehicles");
       if (vehRes.ok) {
@@ -88,7 +90,7 @@ export default function VehiclePage() {
 
   return (
     <div className="frame">
-      <AppHeader dealershipName={dealershipName} />
+      <AppHeader dealershipName={dealershipName} role={who?.role} userName={who?.name} />
       <main>
         <nav className="step-rail">
           <div className="step active">
