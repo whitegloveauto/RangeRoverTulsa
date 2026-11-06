@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { currentTenant } from "@/lib/tenant";
-import { DEFAULT_THEME } from "@/lib/theme";
+import { DEFAULT_THEME, WGA_THEME } from "@/lib/theme";
+import { headers } from "next/headers";
 import ThemeStyle from "@/components/ThemeStyle";
 
 export const metadata: Metadata = {
@@ -31,8 +32,10 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Theme follows the dealership that owns this hostname; WGA pages override it client-side.
-  const tenant = await currentTenant().catch(() => null);
-  const theme = tenant?.theme || DEFAULT_THEME;
+  const path = headers().get("x-pathname") || "";
+  const isWga = path === "/wga" || path.startsWith("/wga/");
+  const tenant = isWga ? null : await currentTenant().catch(() => null);
+  const theme = isWga ? WGA_THEME : tenant?.theme || DEFAULT_THEME;
   return (
     <html lang="en">
       <head>
