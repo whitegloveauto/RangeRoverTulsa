@@ -61,7 +61,7 @@ header.app {
   font-size: 11px; letter-spacing: 0.12em; color: var(--text-2);
 }
 .session .pill { padding: 4px 10px; border: 1px solid var(--stroke); color: var(--gold); border-radius: 1px; }
-.session .signout { background: none; border: none; color: var(--text-2); font-size: 11px; letter-spacing: 0.12em; padding: 4px 0; }
+.session .signout { text-decoration: none; background: none; border: none; color: var(--text-2); font-size: 11px; letter-spacing: 0.12em; padding: 4px 0; }
 .session .signout:hover { color: var(--gold-bright); }
 
 main { flex: 1; padding: 0 32px; }

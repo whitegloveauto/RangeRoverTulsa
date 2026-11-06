@@ -30,9 +30,15 @@ export function useDealerSession() {
 
 export interface WgaSessionInfo {
   user: { name: string; email: string; role: "admin" | "user" };
+  mustChangePassword: boolean;
+  hasPin: boolean;
 }
 
-export function useWgaSession() {
+// Loads the WGA session; redirects to sign-in when there isn't one, and forces
+// the first-sign-in steps (change password → set PIN) before anything else.
+// Pass { gate: false } on the password/PIN pages themselves.
+export function useWgaSession(opts: { gate?: boolean } = {}) {
+  const gate = opts.gate !== false;
   const router = useRouter();
   const [session, setSession] = useState<WgaSessionInfo | null>(null);
   const [ready, setReady] = useState(false);
@@ -43,10 +49,19 @@ export function useWgaSession() {
           router.replace("/wga");
           return;
         }
-        setSession(await r.json());
+        const d: WgaSessionInfo = await r.json();
+        if (gate && d.mustChangePassword) {
+          router.replace("/wga/password?first=1");
+          return;
+        }
+        if (gate && !d.hasPin) {
+          router.replace("/wga/pin?setup=1");
+          return;
+        }
+        setSession(d);
         setReady(true);
       })
       .catch(() => router.replace("/wga"));
-  }, [router]);
+  }, [router, gate]);
   return { session, ready };
 }

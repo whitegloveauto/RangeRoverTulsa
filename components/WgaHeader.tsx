@@ -43,6 +43,8 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
       <div className="session">
         <span className="pill role">{userName.toUpperCase()}</span>
         <span className="pill">{role === "admin" ? "ADMIN" : "TEAM"}</span>
+        <Link href="/wga/pin" className="signout" title="Change PIN">PIN</Link>
+        <Link href="/wga/password" className="signout" title="Change password">Password</Link>
         <button className="signout" onClick={signOut}>
           Sign Out
         </button>
