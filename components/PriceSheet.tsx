@@ -19,18 +19,12 @@ export const SHEET_PRINT_CSS = `
     .sheet-svc { break-inside: avoid; }
   }
   @page { margin: 0.5in; }
-  .ms-stack { display: none; }
+  .ms-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   @media screen and (max-width: 720px) {
-    .sheet.master .ms-table { display: none; }
-    .ms-stack { display: block; }
-    .ms-model { padding: 10px 0; border-bottom: 1px solid #DDD9CF; }
-    .ms-model-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: #0C1A14; margin-bottom: 4px; }
-    .ms-pkgs { display: grid; gap: 4px 14px; font-size: 12.5px; align-items: baseline; }
-    .ms-pkgs .ms-h { font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #777; }
-    .ms-pkgs .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .ms-pkgs .muted { color: #666; }
-    .ms-pkgs .strong { color: #0C1A14; font-weight: 600; }
-    .ms-pkgs .ms-pkg { color: #333; }
+    .ms-table { font-size: 10px !important; }
+    .ms-table th, .ms-table td { padding-left: 5px !important; padding-right: 5px !important; }
+    .ms-table td:first-child, .ms-table th:first-child { position: sticky; left: 0; background: #fff; padding-left: 0 !important; }
+    .ms-table tr:nth-child(even) td:first-child { background: #F7F4ED; }
   }
   @media (max-width: 720px) {
     .sheet { padding: 22px 16px !important; }
@@ -163,6 +157,7 @@ export function MasterSheet({ book, dealership, showCost, showSuggested }: { boo
             <div style={{ fontSize: 11, letterSpacing: "0.2em", color: paper.ink, fontWeight: 700, textTransform: "uppercase" }}>{svc.name}</div>
             {svc.note ? <div style={{ fontSize: 9, letterSpacing: "0.16em", color: paper.gold, textTransform: "uppercase" }}>{svc.note}</div> : null}
           </div>
+          <div className="ms-scroll">
           <table className="ms-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
             <thead>
               <tr>
@@ -204,30 +199,6 @@ export function MasterSheet({ book, dealership, showCost, showSuggested }: { boo
               ))}
             </tbody>
           </table>
-          {/* Phones (screen only): one block per model, packages listed underneath */}
-          <div className="ms-stack">
-            {book.models.map((m) => (
-              <div key={m} className="ms-model">
-                <div className="ms-model-name">{m}</div>
-                <div className="ms-pkgs" style={{ gridTemplateColumns: `1fr ${showCost ? "auto " : ""}${showSuggested ? "auto " : ""}auto` }}>
-                  <span className="ms-h">Package</span>
-                  {showCost ? <span className="ms-h r">Cost</span> : null}
-                  {showSuggested ? <span className="ms-h r">Sugg.</span> : null}
-                  <span className="ms-h r">Price</span>
-                  {svc.items.map((it) => {
-                    const c = book.prices[m]?.[it.id];
-                    return (
-                      <Fragment key={it.id}>
-                        <span className="ms-pkg">{it.name}</span>
-                        {showCost ? <span className="r muted">{money(c?.cost)}</span> : null}
-                        {showSuggested ? <span className="r muted">{money(c?.suggested_retail)}</span> : null}
-                        <span className="r strong">{money(c?.retail)}</span>
-                      </Fragment>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       ))}
