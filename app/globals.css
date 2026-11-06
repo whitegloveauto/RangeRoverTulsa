@@ -361,7 +361,7 @@ main { flex: 1; padding: 0 32px; }
 .link-btn.danger:hover { color: var(--warn); }
 .svc-editor-head { display: flex; align-items: center; gap: 14px; margin: 36px 0 12px; flex-wrap: wrap; }
 .svc-editor-head .svc-title { flex: 1; }
-.svc-editor-head input.title { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text); background: transparent; border: 1px dashed transparent; padding: 2px 6px; outline: none; min-width: 240px; }
+.svc-editor-head input.title { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text); background: transparent; border: 1px dashed transparent; padding: 2px 6px; outline: none; min-width: 0; max-width: 100%; }
 .svc-editor-head input.title:hover, .svc-editor-head input.title:focus { border-color: var(--stroke); }
 .svc-editor-head input.note { font-family: inherit; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-dim); background: transparent; border: 1px dashed transparent; padding: 4px 6px; outline: none; min-width: 200px; }
 .svc-editor-head input.note:hover, .svc-editor-head input.note:focus { border-color: var(--stroke); }
@@ -482,3 +482,39 @@ html, body { overflow-x: hidden; max-width: 100%; }
   body { -webkit-user-select: none; user-select: none; }
   input, textarea { -webkit-user-select: text; user-select: text; }
 }
+
+/* ============ WGA side on phones ============ */
+.pkg-chips { display: none; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.pkg-chips button { background: none; border: 1px solid var(--stroke); color: var(--text-2); font-size: 11px; letter-spacing: 0.08em; padding: 8px 12px; border-radius: 999px; }
+.pkg-chips button.sel { border-color: var(--gold); color: var(--gold-bright); background: rgba(184,153,104,0.1); }
+.user-cards { display: none; flex-direction: column; gap: 10px; }
+.user-card { border: 1px solid var(--stroke); padding: 14px 16px; background: var(--bg); }
+.uc-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.uc-email { font-size: 13px; color: var(--text-2); margin-top: 4px; word-break: break-all; }
+.uc-meta { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+.uc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.uc-actions select { grid-column: 1 / -1; }
+.oc-chev { margin-left: auto; align-self: center; color: var(--text-3); }
+.oc-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--stroke-soft); }
+.oc-actions { display: grid; gap: 12px; margin-top: 14px; }
+.oc-actions .field label { font-size: 10px; letter-spacing: 0.18em; }
+.order-card.open { border-color: var(--gold-dim); }
+@media (max-width: 720px) {
+  .pkg-chips { display: flex; }
+  .user-cards { display: flex; }
+  .pgrid { min-width: 0; width: 100%; }
+  .pgrid th.col:not(.sel), .pgrid td.col:not(.sel) { display: none; }
+  .pgrid th.model, .pgrid td.model { min-width: 0; white-space: normal; font-size: 13px; }
+  .pgrid th.pkg { min-width: 0; }
+  .pgrid .pair label { min-width: 0; }
+  .svc-editor-head { flex-direction: column; align-items: stretch; gap: 8px; }
+  .svc-editor-head input.title { font-size: 20px; }
+  .detail-lines { grid-template-columns: 1fr auto auto; font-size: 12px; }
+  .detail-meta { flex-direction: column; gap: 6px; }
+  .stage { padding-top: 8px; }
+  .stage-sub { font-size: 13px; }
+  .card { padding: 16px; }
+  .toolbar { flex-wrap: wrap; gap: 8px; }
+  .modal { width: calc(100vw - 32px); max-width: none; }
+}
+.user-card select, .oc-actions select, .oc-actions input, .uc-actions select { background: var(--bg); border: 1px solid var(--stroke); color: var(--text); font-family: inherit; font-size: 14px; padding: 10px 12px; border-radius: 1px; outline: none; width: 100%; }

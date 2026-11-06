@@ -36,6 +36,8 @@ export default function PriceGrid({
   const [status, setStatus] = useState<{ text: string; kind: "" | "ok" | "err" }>({ text: "", kind: "" });
   const pending = useRef<Map<string, GridChange>>(new Map());
   const timer = useRef<any>(null);
+  // Phones show one package column at a time (chips pick which); desktop shows them all.
+  const [mobilePkg, setMobilePkg] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Deep copy so inputs are controlled from local state
@@ -109,13 +111,25 @@ export default function PriceGrid({
               </button>
             ) : null}
           </div>
+          {svc.items.length > 1 ? (
+            <div className="pkg-chips">
+              {svc.items.map((it, i) => {
+                const sel = (mobilePkg[svc.id] ?? svc.items[0].id) === it.id;
+                return (
+                  <button key={it.id} className={sel ? "sel" : ""} onClick={() => setMobilePkg((m) => ({ ...m, [svc.id]: it.id }))}>
+                    {it.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="grid-wrap">
             <table className="pgrid">
               <thead>
                 <tr>
                   <th className="model">Model</th>
                   {svc.items.map((it) => (
-                    <th key={it.id} className="pkg">
+                    <th key={it.id} className={"pkg col" + ((mobilePkg[svc.id] ?? svc.items[0]?.id) === it.id ? " sel" : "")}>
                       {mode === "wga" && onRenameItem ? (
                         <div className="pkg-edit">
                           <input
@@ -167,7 +181,7 @@ export default function PriceGrid({
                       const c = local[model]?.[it.id] || { cost: null, suggested_retail: null, retail: null };
                       const id = `${model}-${it.id}`.replace(/\W+/g, "_");
                       return (
-                        <td key={it.id}>
+                        <td key={it.id} className={"col" + ((mobilePkg[svc.id] ?? svc.items[0]?.id) === it.id ? " sel" : "")}>
                           <div className="pair">
                             {mode === "wga" ? (
                               <>

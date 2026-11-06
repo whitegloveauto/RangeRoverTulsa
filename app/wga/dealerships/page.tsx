@@ -92,7 +92,29 @@ export default function WgaDealershipsPage() {
                   <label className="check"><input type="checkbox" checked={d.active} onChange={(e) => act({ action: "dealership.update", id: d.id, active: e.target.checked }).catch((er) => setMsg(er.message))} /> Active</label>
                   <label className="check"><input type="checkbox" checked={d.hide_cost_from_users} onChange={(e) => act({ action: "dealership.update", id: d.id, hide_cost_from_users: e.target.checked }).catch((er) => setMsg(er.message))} /> Hide WGA cost from their sales users</label>
                 </div>
-                <div className="tbl-wrap">
+                {/* Phones: one card per login */}
+                <div className="user-cards">
+                  {du.length === 0 ? <div style={{ fontSize: 12, color: "var(--text-3)" }}>No logins yet — the shared dealership password still works and signs in as an admin.</div> : null}
+                  {du.map((u) => (
+                    <div key={u.id} className="user-card">
+                      <div className="uc-top">
+                        <b>{u.name}</b>
+                        <span className={"status-pill " + (u.active ? "scheduled" : "cancelled")}>{u.active ? "Active" : "Disabled"}</span>
+                      </div>
+                      <div className="uc-email">{u.email}</div>
+                      <div className="uc-meta">Last sign-in {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : "never"}</div>
+                      <div className="uc-actions">
+                        <select value={u.role} onChange={(e) => act({ action: "user.update", id: u.id, role: e.target.value }).catch((er) => setMsg(er.message))}>
+                          <option value="user">Sales</option>
+                          <option value="admin">Dealer admin</option>
+                        </select>
+                        <button className="btn-ghost btn-sm" onClick={() => setModal({ kind: "pw", user: u })}>Reset password</button>
+                        <button className="btn-ghost btn-sm" onClick={() => act({ action: "user.update", id: u.id, active: !u.active }).catch((er) => setMsg(er.message))}>{u.active ? "Disable" : "Enable"}</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="tbl-wrap desktop-only">
                   <table className="tbl" style={{ minWidth: 600 }}>
                     <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last sign-in</th><th /></tr></thead>
                     <tbody>

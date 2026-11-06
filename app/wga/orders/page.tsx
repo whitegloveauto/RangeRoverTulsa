@@ -55,7 +55,16 @@ export default function WgaOrdersPage() {
             ))}
           </div>
           {msg ? <div className="notice warn">{msg}</div> : null}
-          <div className="tbl-wrap">
+
+          {/* Phones: one card per order, tap to expand actions */}
+          <div className="order-cards">
+            {rows.length === 0 ? <div className="card" style={{ textAlign: "center" }}>Nothing here.</div> : null}
+            {rows.map((o) => (
+              <OrderCard key={o.id} o={o} open={open === o.id} onToggle={() => setOpen(open === o.id ? null : o.id)} onPatch={(b) => patch(o.id, b)} />
+            ))}
+          </div>
+
+          <div className="tbl-wrap desktop-only">
             <table className="tbl">
               <thead>
                 <tr><th>Submitted</th><th>Quote #</th><th>RO #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
@@ -131,5 +140,69 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
         </tr>
       ) : null}
     </>
+  );
+}
+
+function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onToggle: () => void; onPatch: (b: any) => Promise<void> }) {
+  const lines: any[] = o.line_items?.length ? o.line_items : [...(o.package_snapshot?.items || []), ...(o.alacarte_items || [])];
+  const when = o.submitted_at || o.created_at;
+  return (
+    <div className={"order-card" + (open ? " open" : "")}>
+      <div onClick={onToggle} style={{ cursor: "pointer" }}>
+        <div className="oc-top">
+          <span className={"status-pill " + o.status}>{(STATUSES.find((s) => s[0] === o.status) || [o.status, o.status])[1]}</span>
+          <span className="oc-num">{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span style={{ color: "#e06b6b" }}>SM failed</span> : "no RO"}</span>
+        </div>
+        <div className="oc-vehicle">{o.vehicle_year} {o.vehicle_model} <span>{o.vehicle_trim}</span></div>
+        <div className="oc-services">{lines.map((l) => l.name).join(" · ") || "—"}</div>
+        <div className="oc-meta">
+          <span>{o.dealer_dealerships?.name || "—"}</span>
+          <span>{new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })} {new Date(when).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+          {o.dealer_user_name ? <span>{o.dealer_user_name}</span> : null}
+          {o.stock_number ? <span>Stock {o.stock_number}</span> : null}
+          {o.assigned_name ? <span>→ {o.assigned_name}</span> : null}
+          {o.scheduled_date ? <span>Sched {o.scheduled_date}</span> : null}
+        </div>
+        <div className="oc-totals">
+          <div><small>WGA bills</small><b>{money(o.cost_total)}</b></div>
+          <div><small>Dealer retail</small><b>{money(o.retail_total)}</b></div>
+          <span className="oc-chev">{open ? "▴" : "▾"}</span>
+        </div>
+      </div>
+      {open ? (
+        <div className="oc-detail">
+          <div className="detail-lines">
+            <span className="h">Line item</span><span className="h r">Bills</span><span className="h r">Retail</span>
+            {lines.map((l, i) => (
+              <Fragment key={i}>
+                <span>{l.name}</span>
+                <span className="r">{money(l.cost)}</span>
+                <span className="r">{money(l.retail)}</span>
+              </Fragment>
+            ))}
+          </div>
+          <div className="detail-meta" style={{ marginTop: 12 }}>
+            <span>Quote <b>{o.quote_number}</b></span>
+            {o.vehicle_vin ? <span>VIN <b>{o.vehicle_vin}</b></span> : null}
+            {o.customer_name ? <span>Customer <b>{o.customer_name}</b>{o.customer_phone ? ` · ${o.customer_phone}` : ""}</span> : null}
+            {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
+            {o.sm_order_number ? <span>ShopMonkey <b>RO {o.sm_order_number}</b></span> : (
+              <span>ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b></span>
+            )}
+          </div>
+          <div className="oc-actions">
+            {!o.sm_order_number ? <button className="btn-primary btn-sm" onClick={() => onPatch({ action: "shopmonkey" })}>Create RO in ShopMonkey</button> : null}
+            <div className="field"><label>Status</label>
+              <select value={o.status} onChange={(e) => onPatch({ status: e.target.value })}>
+                {STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>Assigned to</label><input defaultValue={o.assigned_name || ""} placeholder="Tech / advisor" onBlur={(e) => e.target.value !== (o.assigned_name || "") && onPatch({ assigned_name: e.target.value })} /></div>
+            <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onChange={(e) => onPatch({ scheduled_date: e.target.value })} /></div>
+            <div className="field"><label>Internal notes</label><input defaultValue={o.internal_notes || ""} placeholder="Parts, notes…" onBlur={(e) => e.target.value !== (o.internal_notes || "") && onPatch({ internal_notes: e.target.value })} /></div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
