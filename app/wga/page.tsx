@@ -1,5 +1,7 @@
 "use client";
 
+import WgaTheme from "@/components/WgaTheme";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -72,6 +74,7 @@ export default function WgaLoginPage() {
 
   return (
     <div className="frame">
+      <WgaTheme />
       <main>
         <div className="login-stage">
           {/* eslint-disable-next-line @next/next/no-img-element */}

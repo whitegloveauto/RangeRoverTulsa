@@ -6,8 +6,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CoBrand from "@/components/CoBrand";
 
-// Single dealership for now; becomes a subdomain/slug lookup when more are added.
-const DEALERSHIP_SLUG = "range-rover-tulsa";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +13,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tenant, setTenant] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/tenant").then((r) => (r.ok ? r.json() : null)).then(setTenant).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -37,7 +40,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: DEALERSHIP_SLUG, email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -61,7 +64,7 @@ export default function LoginPage() {
       <main>
         <div className="login-stage">
           <div style={{ marginBottom: 40 }}>
-            <CoBrand size="login" />
+            <CoBrand size="login" logoUrl={tenant?.brand?.logo_url} brandName={tenant?.brand?.name} />
           </div>
           <h1 className="login-title">
             Dealership
@@ -88,7 +91,7 @@ export default function LoginPage() {
           </form>
 
           <div className="login-meta">
-            AUTHORIZED FOR &nbsp; <span>RANGE ROVER · TULSA</span>
+            AUTHORIZED FOR &nbsp; <span>{(tenant?.dealership?.name || "").toUpperCase()}</span>
           </div>
           <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.12em" }}>
             <Link href="/wga" style={{ color: "var(--text-3)" }}>WHITE GLOVE AUTO STAFF →</Link>

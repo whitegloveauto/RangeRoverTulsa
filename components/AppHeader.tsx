@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import CoBrand from "./CoBrand";
 import SideMenu from "./SideMenu";
+import { themeCss } from "@/lib/theme";
 
 // Dealership-side header with navigation. Settings only shows for dealer admins.
 export default function AppHeader({
@@ -19,11 +20,18 @@ export default function AppHeader({
   const router = useRouter();
   const path = usePathname();
   const [viewAs, setViewAs] = useState<string | null>(null);
+  const [brand, setBrand] = useState<{ logo_url: string; name: string } | null>(null);
+  const [themeStyle, setThemeStyle] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setViewAs(d?.viewAs || null))
+      .then((d) => {
+        setViewAs(d?.viewAs || null);
+        if (d?.brand) setBrand(d.brand);
+        // the signed-in dealership's theme wins over the hostname's (matters for WGA "view as")
+        if (d?.theme) setThemeStyle(themeCss(d.theme));
+      })
       .catch(() => {});
   }, []);
 
@@ -46,6 +54,7 @@ export default function AppHeader({
 
   return (
     <>
+    {themeStyle ? <style dangerouslySetInnerHTML={{ __html: themeStyle }} /> : null}
     {viewAs ? (
       <div className="viewas-bar">
         <span>Viewing as <b>{dealershipName}</b> · {role === "admin" ? "dealer admin" : "sales user"} · signed in as {viewAs} (WGA). {role === "admin" ? "You can change their retail prices, team logins and cost visibility under Settings on their behalf." : "This is exactly what their sales users see."} Orders you submit are real.</span>
@@ -54,7 +63,7 @@ export default function AppHeader({
     ) : null}
     <header className="app">
       <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
-        <CoBrand size="header" />
+        <CoBrand size="header" logoUrl={brand?.logo_url} brandName={brand?.name} />
         <nav className="nav-links">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className={path?.startsWith(l.href) ? "active" : ""}>

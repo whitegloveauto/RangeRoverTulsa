@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { currentTenant } from "@/lib/tenant";
+import { DEFAULT_THEME } from "@/lib/theme";
+import ThemeStyle from "@/components/ThemeStyle";
 
 export const metadata: Metadata = {
   title: "WGA Dealer Program",
-  description: "Range Rover Tulsa dealer pricing, quotes and orders from White Glove Auto.",
+  description: "Dealer pricing, quotes and orders from White Glove Auto.",
   applicationName: "WGA Dealer",
   manifest: "/manifest.json",
   icons: {
@@ -26,9 +29,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Theme follows the dealership that owns this hostname; WGA pages override it client-side.
+  const tenant = await currentTenant().catch(() => null);
+  const theme = tenant?.theme || DEFAULT_THEME;
   return (
     <html lang="en">
+      <head>
+        <ThemeStyle theme={theme} />
+      </head>
       <body>
         <div className="ambient" />
         {children}

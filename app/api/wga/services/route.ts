@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaAdmin } from "@/lib/session";
+import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
 
@@ -24,13 +25,16 @@ export async function POST(req: Request) {
 
   switch (b.action) {
     case "service.create": {
+      const sel = await selectedDealership();
+      const BRAND = sel?.brand || "Range Rover";
+      const BRAND_KEY = sel?.brand_key || "land-rover";
       const name = String(b.name || "").trim();
       if (!name) return fail("Service name is required.", 400);
       const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
-      const { data: max } = await supabaseAdmin.from("dealer_services").select("sort_order").eq("brand", "Range Rover").order("sort_order", { ascending: false }).limit(1);
+      const { data: max } = await supabaseAdmin.from("dealer_services").select("sort_order").eq("brand", BRAND).order("sort_order", { ascending: false }).limit(1);
       const { data, error } = await supabaseAdmin
         .from("dealer_services")
-        .insert({ brand: "Range Rover", key, name, note: b.note || null, sort_order: ((max?.[0]?.sort_order as number) || 0) + 1 })
+        .insert({ brand: BRAND, brand_key: BRAND_KEY, key, name, note: b.note || null, sort_order: ((max?.[0]?.sort_order as number) || 0) + 1 })
         .select("*")
         .single();
       if (error) return fail("Could not create service.");

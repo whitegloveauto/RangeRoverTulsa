@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
+import { tenantByDealershipId } from "@/lib/tenant";
 
 // Everything the customer packet needs, assembled server-side.
 export interface PacketData {
@@ -15,12 +16,13 @@ export interface PacketData {
     created_at: string;
     submitted_at: string | null;
   };
-  dealership: { name: string; location: string | null };
+  dealership: { id: string; name: string; location: string | null };
   lines: { item_id: string; service: string; name: string; retail: number; description: string | null; zones: string[]; blurb: string | null }[];
   services: { id: string; name: string; product_name: string | null; blurb: string | null; facts: string[] }[];
   zones: string[];
   imageUrl: string | null;
   preparedBy: string | null;
+  brand: { name: string; make: string; logo_url: string };
 }
 
 export async function loadPacket(where: { id?: string; token?: string; dealershipId?: string }): Promise<PacketData | null> {
@@ -38,6 +40,7 @@ export async function loadPacket(where: { id?: string; token?: string; dealershi
   const lineItems: any[] = Array.isArray(qr.line_items) ? qr.line_items : [];
   const itemIds = lineItems.map((l) => l.item_id).filter(Boolean);
 
+  const tenant = await tenantByDealershipId(qr.dealership_id).catch(() => null);
   const [{ data: items }, { data: services }, { data: img }] = await Promise.all([
     itemIds.length ? supabaseAdmin.from("dealer_service_items").select("id, service_id, description, zones, blurb").in("id", itemIds) : Promise.resolve({ data: [] as any[] }),
     supabaseAdmin.from("dealer_services").select("id, name, product_name, blurb, facts, sort_order").eq("brand", brand).order("sort_order"),
@@ -54,12 +57,13 @@ export async function loadPacket(where: { id?: string; token?: string; dealershi
 
   return {
     quote: { id: qr.id, quote_number: qr.quote_number, vehicle_year: qr.vehicle_year, vehicle_model: qr.vehicle_model, vehicle_trim: qr.vehicle_trim, stock_number: qr.stock_number, customer_name: qr.customer_name, retail_total: Number(qr.retail_total ?? 0), created_at: qr.created_at, submitted_at: qr.submitted_at },
-    dealership: { name: d?.name || "Dealership", location: d?.location || null },
+    dealership: { id: qr.dealership_id, name: d?.name || "Dealership", location: d?.location || null },
     lines,
     services: svc,
     zones,
     imageUrl: img?.image_url || null,
     preparedBy: qr.dealer_user_name || null,
+    brand: { name: tenant?.brand.name || brand, make: tenant?.brand.make || brand, logo_url: tenant?.brand.logo_url || "/landrover.png" },
   };
 }
 

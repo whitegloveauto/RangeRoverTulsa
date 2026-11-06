@@ -17,6 +17,9 @@ interface QuoteData {
   vehicle_vin: string | null;
   customer_name: string | null;
   stock_number: string | null;
+  available_from?: string | null;
+  needed_by?: string | null;
+  sm_order_number?: string | null;
   package_tier: string | null;
   package_snapshot: any;
   tint_upgrade: boolean;
@@ -252,10 +255,13 @@ export default function QuoteSheetPage() {
                   {quote.vehicle_trim}
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 24, marginTop: 8, fontSize: 11, color: "#555" }}>
+              <div style={{ display: "flex", gap: 24, marginTop: 8, fontSize: 11, color: "#555", flexWrap: "wrap" }}>
                 {quote.vehicle_vin && <span>VIN: {quote.vehicle_vin}</span>}
                 {quote.stock_number && <span>Stock #: {quote.stock_number}</span>}
                 {quote.customer_name && <span>Customer: {quote.customer_name}</span>}
+                {quote.available_from && <span>Available from: {quote.available_from}</span>}
+                {quote.needed_by && <span>Needed back by: {quote.needed_by}</span>}
+                {quote.sm_order_number && <span>WGA ticket: RO {quote.sm_order_number}</span>}
               </div>
             </div>
 

@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import SideMenu from "./SideMenu";
+import WgaTheme from "./WgaTheme";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 // White Glove Auto admin header.
 export default function WgaHeader({ userName, role }: { userName: string; role: "admin" | "user" }) {
   const router = useRouter();
   const path = usePathname();
+  const [ctx, setCtx] = useState<{ dealerships: any[]; selected: any } | null>(null);
+  useEffect(() => {
+    fetch("/api/wga/context").then((r) => (r.ok ? r.json() : null)).then(setCtx).catch(() => {});
+  }, []);
+  async function switchDealer(id: string) {
+    await fetch("/api/wga/context", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    window.location.reload();
+  }
 
   async function signOut() {
     await fetch("/api/wga/auth/logout", { method: "POST" });
@@ -32,12 +42,14 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
   ];
 
   return (
-    <header className="app">
+    <>
+    <WgaTheme />
+    <header className="app wga">
       <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/wga-white.png" alt="White Glove Auto" style={{ height: 18, width: "auto", display: "block" }} />
-          <span style={{ fontSize: 10, letterSpacing: "0.22em", color: "var(--gold)" }}>DEALER PROGRAM · ADMIN</span>
+          <span className="wga-eyebrow" style={{ fontSize: 10, letterSpacing: "0.22em", color: "var(--gold)", whiteSpace: "nowrap" }}>DEALER PROGRAM</span>
         </div>
         <nav className="nav-links">
           {links.map((l) => (
@@ -48,6 +60,13 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
         </nav>
       </div>
       <div className="session">
+        {ctx && ctx.dealerships.length > 0 ? (
+          <label className="dealer-switch" title="Which dealership you're working on (pricing, vehicles, settings)">
+            <select value={ctx.selected?.id || ""} onChange={(e) => switchDealer(e.target.value)}>
+              {ctx.dealerships.map((d) => <option key={d.id} value={d.id}>{d.short_name || d.name}{d.active ? "" : " (inactive)"}</option>)}
+            </select>
+          </label>
+        ) : null}
         <span className="pill role">{userName.toUpperCase()}</span>
         <span className="pill">{role === "admin" ? "ADMIN" : "TEAM"}</span>
         {role === "admin" ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
@@ -64,5 +83,6 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
         actions={[...(role === "admin" ? [{ label: "View as dealership ↗", onClick: viewAsDealer, accent: true }] : []), { label: "Sign Out", onClick: signOut }]}
       />
     </header>
+    </>
   );
 }

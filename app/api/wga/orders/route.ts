@@ -17,9 +17,10 @@ export async function GET(req: Request) {
   let q = supabaseAdmin
     .from("dealer_quotes")
     .select(
-      "id, quote_number, dealership_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, customer_phone, customer_email, line_items, package_snapshot, alacarte_items, retail_total, cost_total, gross_total, status, notes, internal_notes, assigned_name, scheduled_date, submitted_at, status_updated_at, created_at, dealer_user_name, sm_order_id, sm_order_number, sm_synced_at, sm_sync_error, dealer_dealerships(name)"
+      "id, quote_number, dealership_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, customer_phone, customer_email, line_items, package_snapshot, alacarte_items, retail_total, cost_total, gross_total, status, notes, internal_notes, assigned_name, scheduled_date, submitted_at, status_updated_at, created_at, dealer_user_name, sm_order_id, sm_order_number, sm_synced_at, sm_sync_error, available_from, needed_by, urgency, dealer_dealerships(name, short_name)"
     )
     .neq("status", "draft")
+    .order("needed_by", { ascending: true, nullsFirst: false })
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .limit(200);
   if (status && status !== "all") q = q.eq("status", status);

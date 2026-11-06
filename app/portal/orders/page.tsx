@@ -47,7 +47,9 @@ export default function OrdersPage() {
                 <div className="oc-meta">
                   {q.customer_name ? <span>{q.customer_name}</span> : null}
                   {q.stock_number ? <span>Stock {q.stock_number}</span> : null}
+                  {q.needed_by ? <span>Needed by {q.needed_by}</span> : null}
                   {q.scheduled_date ? <span>Scheduled {q.scheduled_date}</span> : null}
+                  {q.sm_order_number ? <span>RO {q.sm_order_number}</span> : null}
                   {q.dealer_user_name ? <span>{q.dealer_user_name}</span> : null}
                 </div>
                 <div className="oc-totals">

@@ -21,6 +21,8 @@ export default function PricingPage() {
   const [stockNumber, setStockNumber] = useState("");
   const [vin, setVin] = useState("");
   const [notes, setNotes] = useState("");
+  const [availableFrom, setAvailableFrom] = useState("");
+  const [neededBy, setNeededBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean }>({ text: "" });
 
@@ -77,6 +79,8 @@ export default function PricingPage() {
         vehicleTrim: vehicle.trim,
         vehicleVin: vin,
         stockNumber,
+        availableFrom,
+        neededBy,
         customerName,
         customerPhone,
         notes,
@@ -198,7 +202,9 @@ export default function PricingPage() {
               <div className="field"><label htmlFor="phone">Customer phone</label><input id="phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" /></div>
               <div className="field"><label htmlFor="stock">Stock #</label><input id="stock" value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} /></div>
               <div className="field"><label htmlFor="vin">VIN</label><input id="vin" value={vin} onChange={(e) => setVin(e.target.value)} placeholder="17 characters" /></div>
-              <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="notes">Notes for White Glove Auto</label><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Delivery date, special requests…" /></div>
+              <div className="field"><label htmlFor="avail">Vehicle available from</label><input id="avail" type="date" value={availableFrom} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setAvailableFrom(e.target.value)} /></div>
+              <div className="field"><label htmlFor="needed">Needed back by</label><input id="needed" type="date" value={neededBy} min={availableFrom || new Date().toISOString().slice(0, 10)} onChange={(e) => setNeededBy(e.target.value)} /></div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="notes">Notes for White Glove Auto</label><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special requests…" /></div>
             </div>
             <div className="db-actions">
               <button className="btn-ghost" disabled={busy || !totals.count} onClick={() => save(false)}>Save quote</button>

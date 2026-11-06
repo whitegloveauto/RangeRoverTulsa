@@ -44,12 +44,12 @@ const paper = {
 
 const money = (v: number | null | undefined) => (v === null || v === undefined ? "—" : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 }));
 
-function Letterhead({ dealership, right }: { dealership: string; right?: React.ReactNode }) {
+function Letterhead({ dealership, right, logo, brandName }: { dealership: string; right?: React.ReactNode; logo?: string | null; brandName?: string | null }) {
   return (
     <div className="sheet-letterhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${paper.ink}`, paddingBottom: 18, marginBottom: 24 }}>
       <div className="sheet-logos" style={{ display: "flex", alignItems: "center", gap: 22 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/landrover.png" alt="Land Rover" style={{ height: 44, width: "auto", display: "block" }} />
+        <img src={logo || "/landrover.png"} alt={brandName || "Dealership"} style={{ height: 44, width: "auto", maxWidth: 150, objectFit: "contain", display: "block" }} />
         <div style={{ width: 1, height: 36, background: paper.rule }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto", display: "block" }} />
@@ -74,6 +74,8 @@ function Footer() {
 }
 
 export function VehicleSheet({
+  logo,
+  brandName,
   book,
   model,
   year,
@@ -89,12 +91,14 @@ export function VehicleSheet({
   dealership: string;
   showCost: boolean;
   showSuggested: boolean;
+  logo?: string | null;
+  brandName?: string | null;
 }) {
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const prices = book.prices[model] || {};
   return (
     <div className="sheet" style={{ width: "100%", maxWidth: 800, background: "#fff", color: "#1A1A1A", padding: "48px 56px 36px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", margin: "0 auto" }}>
-      <Letterhead dealership={dealership} right={<div style={{ fontSize: 10, color: paper.muted, marginTop: 4 }}>{dateStr}</div>} />
+      <Letterhead dealership={dealership} logo={logo} brandName={brandName} right={<div style={{ fontSize: 10, color: paper.muted, marginTop: 4 }}>{dateStr}</div>} />
       <div style={{ background: paper.tint, borderLeft: `3px solid #B89968`, padding: "16px 20px", marginBottom: 26 }}>
         <div style={{ fontSize: 9, letterSpacing: "0.22em", color: paper.gold, textTransform: "uppercase", marginBottom: 6 }}>Protection pricing</div>
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, color: paper.ink, lineHeight: 1.05 }}>
@@ -142,7 +146,7 @@ export function VehicleSheet({
   );
 }
 
-export function MasterSheet({ book, dealership, showCost, showSuggested }: { book: PricingBook; dealership: string; showCost: boolean; showSuggested: boolean }) {
+export function MasterSheet({ book, dealership, showCost, showSuggested, logo, brandName }: { book: PricingBook; dealership: string; showCost: boolean; showSuggested: boolean; logo?: string | null; brandName?: string | null }) {
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const cols = 1 + (showCost ? 1 : 0) + (showSuggested ? 1 : 0);
   const maxCols = Math.max(0, ...book.services.map((svc) => svc.items.length * cols));
@@ -150,7 +154,7 @@ export function MasterSheet({ book, dealership, showCost, showSuggested }: { boo
   return (
     <div className={"sheet master" + (wide ? " wide" : "")} style={{ width: "100%", maxWidth: wide ? 1240 : 1040, background: "#fff", color: "#1A1A1A", padding: "44px 48px 36px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", margin: "0 auto" }}>
       {wide ? <style>{`@media print { @page { size: landscape; margin: 0.4in; } .sheet.wide table { font-size: 10px !important; } }`}</style> : null}
-      <Letterhead dealership={dealership} right={<div style={{ fontSize: 10, color: paper.muted, marginTop: 4 }}>Master price sheet · {dateStr}</div>} />
+      <Letterhead dealership={dealership} logo={logo} brandName={brandName} right={<div style={{ fontSize: 10, color: paper.muted, marginTop: 4 }}>Master price sheet · {dateStr}</div>} />
       {book.services.map((svc) => (
         <div key={svc.id} className="sheet-svc" style={{ marginBottom: 26 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: `1px solid ${paper.ink}`, paddingBottom: 6, marginBottom: 4 }}>

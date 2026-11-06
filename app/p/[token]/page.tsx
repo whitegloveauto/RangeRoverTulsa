@@ -1,5 +1,7 @@
 import { loadPacket } from "@/lib/packet";
 import CustomerPacket, { PACKET_CSS } from "@/components/CustomerPacket";
+import ThemeStyle from "@/components/ThemeStyle";
+import { tenantByDealershipId } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +13,10 @@ export default async function PublicPacketPage({ params }: { params: { token: st
       <div className="frame"><main><div className="login-stage"><h1 className="login-title">This link has expired.</h1><p className="login-sub">Ask your dealership advisor for a fresh copy of your protection proposal.</p></div></main></div>
     );
   }
+  const tenant = await tenantByDealershipId(data.dealership.id).catch(() => null);
   return (
     <div className="frame">
+      {tenant ? <ThemeStyle theme={tenant.theme} /> : null}
       <style>{PACKET_CSS}</style>
       <main style={{ padding: "24px 12px 48px" }}>
         <CustomerPacket data={data} />

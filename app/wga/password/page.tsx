@@ -1,5 +1,7 @@
 "use client";
 
+import WgaTheme from "@/components/WgaTheme";
+
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWgaSession } from "@/lib/useDealerSession";
@@ -55,6 +57,6 @@ function Inner() {
 
 export default function WgaPasswordPage() {
   return (
-    <div className="frame"><main><Suspense fallback={null}><Inner /></Suspense></main></div>
+    <div className="frame"><WgaTheme /><main><Suspense fallback={null}><Inner /></Suspense></main></div>
   );
 }

@@ -3,8 +3,8 @@ import type { PricingBook, DealerService, DealerServiceItem, ModelPrice } from "
 
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 
-// Assemble the full pricing book for a brand. When dealershipId is given, the
-// dealership's own retail prices overlay the suggested retail.
+// Assemble the full pricing book. Catalog (services, packages, models) is per BRAND;
+// WGA cost / suggested retail is per DEALERSHIP; the dealership's own retail overlays suggested.
 export async function loadPricingBook(opts: {
   brand: string;
   dealershipId?: string | null;
@@ -17,7 +17,9 @@ export async function loadPricingBook(opts: {
     supabaseAdmin.from("dealer_services").select("*").eq("brand", brand).order("sort_order"),
     supabaseAdmin.from("dealer_service_items").select("*").order("sort_order"),
     supabaseAdmin.from("dealer_vehicles").select("model, sort_order").eq("brand", brand).eq("active", true).order("sort_order"),
-    supabaseAdmin.from("dealer_model_pricing").select("model, item_id, cost, suggested_retail").eq("brand", brand),
+    dealershipId
+      ? supabaseAdmin.from("dealer_model_pricing").select("model, item_id, cost, suggested_retail").eq("dealership_id", dealershipId)
+      : Promise.resolve({ data: [] as any[], error: null }),
     dealershipId
       ? supabaseAdmin.from("dealer_retail_prices").select("model, item_id, retail").eq("dealership_id", dealershipId)
       : Promise.resolve({ data: [] as any[], error: null }),

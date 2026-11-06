@@ -16,7 +16,7 @@ export async function GET() {
   let q = supabaseAdmin
     .from("dealer_quotes")
     .select(
-      "id, quote_number, vehicle_year, vehicle_model, vehicle_trim, stock_number, customer_name, line_items, retail_total, cost_total, gross_total, status, scheduled_date, submitted_at, created_at, dealer_user_name"
+      "id, quote_number, vehicle_year, vehicle_model, vehicle_trim, stock_number, customer_name, line_items, retail_total, cost_total, gross_total, status, scheduled_date, submitted_at, created_at, dealer_user_name, available_from, needed_by, urgency, sm_order_number"
     )
     .eq("dealership_id", session.dealershipId)
     .order("created_at", { ascending: false })
@@ -42,7 +42,11 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  const { vehicleYear, vehicleModel, vehicleTrim, vehicleVin, stockNumber, customerName, customerPhone, customerEmail, notes, itemIds, submit } = body;
+  const { vehicleYear, vehicleModel, vehicleTrim, vehicleVin, stockNumber, customerName, customerPhone, customerEmail, notes, itemIds, submit, availableFrom, neededBy } = body;
+  const isoDate = (v: any) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const availDate = isoDate(availableFrom);
+  const needDate = isoDate(neededBy);
+  if (availDate && needDate && needDate < availDate) return NextResponse.json({ error: "\"Needed back by\" can't be before the vehicle is available." }, { status: 400 });
   if (!vehicleYear || !vehicleModel || !vehicleTrim) {
     return NextResponse.json({ error: "Vehicle year, model, and trim are required." }, { status: 400 });
   }
@@ -68,6 +72,9 @@ export async function POST(req: Request) {
   const costTotal = lines.reduce((s, l) => s + l.cost, 0);
   const isSubmit = !!submit;
   const now = new Date().toISOString();
+  // Urgency from how tight the window is (today → needed_by): <3 days urgent, <7 soon, else normal.
+  const daysUntil = needDate ? Math.ceil((new Date(needDate + "T00:00:00").getTime() - Date.now()) / 86400000) : null;
+  const urgency = daysUntil === null ? "normal" : daysUntil < 3 ? "urgent" : daysUntil < 7 ? "soon" : "normal";
 
   const { data, error } = await supabaseAdmin
     .from("dealer_quotes")
@@ -82,6 +89,9 @@ export async function POST(req: Request) {
       customer_phone: customerPhone || null,
       customer_email: customerEmail || null,
       notes: notes || null,
+      available_from: availDate,
+      needed_by: needDate,
+      urgency,
       line_items: lines,
       alacarte_items: [],
       package_snapshot: null,
@@ -111,9 +121,9 @@ export async function POST(req: Request) {
     // ShopMonkey ticket first so the push can carry the RO number.
     const sm = await createShopMonkeyTicket(data.id);
     await notifyWga(
-      sm.ok && sm.number ? `New Range Rover order · RO ${sm.number}` : "New Range Rover order",
-      `${session.name}: ${vehicleYear} ${vehicleModel} ${vehicleTrim} — ${lines.map((l) => l.name).join(", ")} · $${costTotal.toLocaleString("en-US")}`,
-      { quote_id: data.id, quote_number: data.quote_number, sm_order_number: sm.number ?? null }
+      sm.ok && sm.number ? `New ${session.brand} order · RO ${sm.number}` : `New ${session.brand} order`,
+      `${session.name}: ${vehicleYear} ${vehicleModel} ${vehicleTrim} — ${lines.map((l) => l.name).join(", ")} · $${costTotal.toLocaleString("en-US")}${needDate ? ` · needed by ${needDate}${urgency === "urgent" ? " ⚠️" : ""}` : ""}`,
+      { quote_id: data.id, quote_number: data.quote_number, sm_order_number: sm.number ?? null, needed_by: needDate, urgency }
     );
     return NextResponse.json({ ok: true, quote: { ...data, sm_order_number: sm.number ?? null }, submitted: true });
   }

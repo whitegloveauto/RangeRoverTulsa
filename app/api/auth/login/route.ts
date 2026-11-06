@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { createSession, setSessionCookie } from "@/lib/session";
+import { currentTenant } from "@/lib/tenant";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const slug = (body.slug || "").trim().toLowerCase();
+  // The dealership is whoever owns this hostname (a slug in the body can override for testing).
+  const tenant = await currentTenant();
+  const slug = (body.slug || tenant?.dealership.slug || "").trim().toLowerCase();
   const email = (body.email || "").trim().toLowerCase();
   const password = body.password || "";
   if (!slug || !password) {

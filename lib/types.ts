@@ -44,6 +44,7 @@ export interface ModelPrice {
 
 // Fully assembled pricing for one dealership, keyed by model then item id.
 export interface PricingBook {
+  dealership?: { id: string; name: string; brand: string };
   brand: string;
   models: string[];
   services: (DealerService & { items: DealerServiceItem[] })[];

@@ -79,7 +79,7 @@ export default function WgaPricingPage() {
       <main>
         <div className="stage" style={{ maxWidth: 1240 }}>
           <div className="stage-head">
-            <div className="stage-eyebrow">RANGE ROVER · DEALER PRICING</div>
+            <div className="stage-eyebrow">{(book?.dealership?.name || "DEALER").toUpperCase()} · DEALER PRICING</div>
             <div className="stage-title">What we charge the dealership.</div>
             <div className="stage-sub">
               One price per model. <b>WGA cost</b> is what White Glove Auto bills the dealer. <b>Suggested retail</b> is their starting customer price (they can override it). Changes save automatically and show in the dealer portal immediately.

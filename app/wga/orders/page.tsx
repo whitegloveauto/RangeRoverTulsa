@@ -4,6 +4,19 @@ import { Fragment, useEffect, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
 import { useWgaSession } from "@/lib/useDealerSession";
 
+// Live urgency from the deadline: <3 days urgent, <7 soon. Done/cancelled orders aren't urgent.
+function dueInfo(o: any): { label: string; cls: string } | null {
+  if (!o.needed_by) return null;
+  const d = Math.ceil((new Date(o.needed_by + "T00:00:00").getTime() - Date.now()) / 86400000);
+  const closed = o.status === "complete" || o.status === "cancelled";
+  const when = new Date(o.needed_by + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (closed) return { label: `Due ${when}`, cls: "due" };
+  if (d < 0) return { label: `Overdue ${-d}d`, cls: "due urgent" };
+  if (d === 0) return { label: "Due today", cls: "due urgent" };
+  if (d < 3) return { label: `Due ${when} · ${d}d`, cls: "due urgent" };
+  if (d < 7) return { label: `Due ${when} · ${d}d`, cls: "due soon" };
+  return { label: `Due ${when}`, cls: "due" };
+}
 const money = (n: number | null | undefined) => (n === null || n === undefined ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }));
 const STATUSES = [
   ["new", "New"],
@@ -67,10 +80,10 @@ export default function WgaOrdersPage() {
           <div className="tbl-wrap desktop-only">
             <table className="tbl">
               <thead>
-                <tr><th>Submitted</th><th>Quote #</th><th>RO #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
+                <tr><th>Submitted</th><th>Due</th><th>Quote #</th><th>RO #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? <tr><td colSpan={10} style={{ textAlign: "center", padding: 28 }}>Nothing here.</td></tr> : null}
+                {rows.length === 0 ? <tr><td colSpan={11} style={{ textAlign: "center", padding: 28 }}>Nothing here.</td></tr> : null}
                 {rows.map((o) => (
                   <OrderRow key={o.id} o={o} open={open === o.id} onToggle={() => setOpen(open === o.id ? null : o.id)} onPatch={(b) => patch(o.id, b)} />
                 ))}
@@ -90,6 +103,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
     <>
       <tr onClick={onToggle} style={{ cursor: "pointer" }}>
         <td>{new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })}<br /><span style={{ fontSize: 11 }}>{new Date(when).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span></td>
+        <td>{(() => { const d = dueInfo(o); return d ? <span className={"status-pill " + d.cls}>{d.label}</span> : <span style={{ color: "var(--text-3)" }}>—</span>; })()}{o.available_from ? <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-3)" }}>avail {new Date(o.available_from + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div> : null}</td>
         <td><b>{o.quote_number}</b></td>
         <td>{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span className="status-pill cancelled" title={o.sm_sync_error}>SM failed</span> : <span style={{ color: "var(--text-3)" }}>—</span>}</td>
         <td>{o.dealer_dealerships?.name || "—"}<br /><span style={{ fontSize: 11 }}>{o.dealer_user_name || ""}</span></td>
@@ -102,7 +116,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
       </tr>
       {open ? (
         <tr className="detail-row">
-          <td colSpan={10}>
+          <td colSpan={11}>
             <div className="detail-lines">
               <span className="h">Line item</span><span className="h r">WGA bills</span><span className="h r">Dealer retail</span>
               {lines.map((l, i) => (
@@ -114,6 +128,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
               ))}
             </div>
             <div className="detail-meta">
+              {o.available_from || o.needed_by ? <span>Window <b>{o.available_from || "any"} → {o.needed_by || "no deadline"}</b></span> : null}
               {o.vehicle_vin ? <span>VIN <b>{o.vehicle_vin}</b></span> : null}
               {o.stock_number ? <span>Stock <b>{o.stock_number}</b></span> : null}
               {o.customer_name ? <span>Customer <b>{o.customer_name}</b>{o.customer_phone ? ` · ${o.customer_phone}` : ""}</span> : null}
@@ -153,6 +168,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
           <span className={"status-pill " + o.status}>{(STATUSES.find((s) => s[0] === o.status) || [o.status, o.status])[1]}</span>
           <span className="oc-num">{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span style={{ color: "#e06b6b" }}>SM failed</span> : "no RO"}</span>
         </div>
+        {(() => { const d = dueInfo(o); return d ? <div style={{ marginBottom: 8 }}><span className={"status-pill " + d.cls}>{d.label}</span>{o.available_from ? <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: 10 }}>available {new Date(o.available_from + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span> : null}</div> : null; })()}
         <div className="oc-vehicle">{o.vehicle_year} {o.vehicle_model} <span>{o.vehicle_trim}</span></div>
         <div className="oc-services">{lines.map((l) => l.name).join(" · ") || "—"}</div>
         <div className="oc-meta">

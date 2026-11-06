@@ -4,7 +4,7 @@ import VehicleDiagram, { ZONES } from "./VehicleDiagram";
 import type { PacketData } from "@/lib/packet";
 
 // Customer-facing protection proposal. Light "paper" document, print-ready,
-// Land Rover × White Glove Auto co-branded. Rendered for the dealer (with a toolbar)
+// Dealership brand × White Glove Auto co-branded. Rendered for the dealer (with a toolbar)
 // and on the public share link (no toolbar).
 
 const C = { ink: "#0C1A14", gold: "#8A7752", goldSoft: "#C9B58A", rule: "#DDD9CF", tint: "#F7F4ED", muted: "#5B5B5B", green: "#0F4D34" };
@@ -54,7 +54,7 @@ export default function CustomerPacket({ data }: { data: PacketData }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, paddingBottom: 20, borderBottom: `2px solid ${C.ink}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landrover.png" alt="Land Rover" style={{ height: 46, width: "auto" }} />
+            <img src={data.brand.logo_url} alt={data.brand.name} style={{ height: 46, width: "auto", maxWidth: 160, objectFit: "contain" }} />
             <div style={{ width: 1, height: 38, background: C.rule }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto" }} />
@@ -77,7 +77,7 @@ export default function CustomerPacket({ data }: { data: PacketData }) {
               </div>
             ) : null}
             <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "#333", marginTop: 24, maxWidth: 380 }}>
-              A factory-fresh Land Rover deserves to stay that way. This proposal covers the XPEL protection selected for your vehicle — installed by White Glove Auto, Oklahoma&apos;s largest XPEL installer, before you ever take delivery.
+              A factory-fresh {data.brand.make} deserves to stay that way. This proposal covers the XPEL protection selected for your vehicle — installed by White Glove Auto, Oklahoma&apos;s largest XPEL installer, before you ever take delivery.
             </p>
           </div>
           <div>

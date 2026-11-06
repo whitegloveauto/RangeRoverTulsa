@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaAdmin } from "@/lib/session";
+import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
-const BRAND = "Range Rover";
+const brandOf = async () => (await selectedDealership())?.brand || "Range Rover";
 const BUCKET = "dealer-assets";
 
 // GET — { images: { [model]: url } }
 export async function GET() {
   const s = await requireWgaAdmin();
   if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const BRAND = await brandOf();
   const { data } = await supabaseAdmin.from("dealer_model_images").select("model, image_url").eq("brand", BRAND);
   const images: Record<string, string> = {};
   for (const r of data || []) images[r.model] = r.image_url;
@@ -20,6 +22,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const s = await requireWgaAdmin();
   if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const BRAND = await brandOf();
   const form = await req.formData();
   const model = String(form.get("model") || "").trim();
   const file = form.get("file") as File | null;
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const s = await requireWgaAdmin();
   if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const BRAND = await brandOf();
   const { model } = await req.json().catch(() => ({}));
   if (!model) return NextResponse.json({ error: "Model required." }, { status: 400 });
   await supabaseAdmin.from("dealer_model_images").delete().eq("brand", BRAND).eq("model", model);

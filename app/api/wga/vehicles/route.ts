@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaAdmin } from "@/lib/session";
+import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
 
-const BRAND = "Range Rover";
+const brandOf = async () => (await selectedDealership())?.brand || "Range Rover";
 
 // GET /api/wga/vehicles — every catalog row (active + inactive) for the admin grid
 export async function GET() {
   const s = await requireWgaAdmin();
   if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const BRAND = await brandOf();
   const { data, error } = await supabaseAdmin
     .from("dealer_vehicles")
     .select("id, year, model, trim, sort_order, active")
@@ -31,6 +33,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const s = await requireWgaAdmin();
   if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const BRAND = await brandOf();
   let b: any;
   try {
     b = await req.json();
