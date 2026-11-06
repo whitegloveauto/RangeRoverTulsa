@@ -279,7 +279,6 @@ main { flex: 1; padding: 0 32px; }
 @media (max-width: 720px) {
   main { padding: 0 18px; }
   header.app { padding: 14px 18px; }
-  .session .signout { display: none; }
   .package { grid-template-columns: 1fr; gap: 16px; padding: 20px 22px; }
   .pkg-price { text-align: left; }
   .pkg-price .amount { font-size: 28px; }
@@ -407,7 +406,6 @@ main { flex: 1; padding: 0 32px; }
 .tabs button { background: none; border: none; color: var(--text-3); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; padding: 14px 20px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--gold); }
 @media (max-width: 720px) {
-  .nav-links { display: none; }
   .svc-head { flex-direction: column; gap: 6px; }
   .svc-item { grid-template-columns: 20px 1fr auto; gap: 12px; padding: 12px 16px; }
 }
@@ -417,3 +415,14 @@ main { flex: 1; padding: 0 32px; }
 .viewas-bar b { color: #fff; }
 .viewas-bar button { background: var(--gold); color: #111; border: none; border-radius: 4px; padding: 6px 12px; font-size: 11px; letter-spacing: 0.12em; cursor: pointer; }
 @media print { .viewas-bar { display: none; } }
+
+/* Phone header: stack brand / nav / session, hide nothing */
+@media (max-width: 720px) {
+  header.app { flex-direction: column; align-items: stretch; gap: 12px; }
+  header.app > div:first-child { flex-direction: column; align-items: flex-start !important; gap: 12px !important; }
+  .nav-links { flex-wrap: wrap; gap: 14px 18px; }
+  .session { flex-wrap: wrap; gap: 10px 16px; padding-top: 10px; border-top: 1px solid var(--stroke); }
+  .session .pill.role { display: none; }
+  .session .signout { font-size: 11px; }
+  .viewas-bar { padding: 8px 16px; font-size: 11px; }
+}

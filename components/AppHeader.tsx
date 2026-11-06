@@ -47,7 +47,7 @@ export default function AppHeader({
     <>
     {viewAs ? (
       <div className="viewas-bar">
-        <span>Viewing as <b>{dealershipName}</b> · {role === "admin" ? "dealer admin" : "sales user"} · signed in as {viewAs} (WGA). Everything here is exactly what they see — orders you submit are real.</span>
+        <span>Viewing as <b>{dealershipName}</b> · {role === "admin" ? "dealer admin" : "sales user"} · signed in as {viewAs} (WGA). {role === "admin" ? "You can change their retail prices, team logins and cost visibility under Settings on their behalf." : "This is exactly what their sales users see."} Orders you submit are real.</span>
         <button onClick={exitViewAs}>Exit dealer view</button>
       </div>
     ) : null}
