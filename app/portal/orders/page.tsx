@@ -33,7 +33,31 @@ export default function OrdersPage() {
             <div className="stage-title">Your orders.</div>
             <div className="stage-sub">{session.user.role === "admin" ? "Everything submitted by your dealership." : "Quotes and orders you've created."}</div>
           </div>
-          <div className="tbl-wrap">
+          {/* Phone: one card per order */}
+          <div className="order-cards">
+            {loaded && rows.length === 0 ? <div className="card" style={{ textAlign: "center" }}>No quotes yet. Start with a new quote.</div> : null}
+            {rows.map((q) => (
+              <Link key={q.id} href={`/portal/quote/${q.id}`} className="order-card">
+                <div className="oc-top">
+                  <span className={"status-pill " + q.status}>{STATUS_LABEL[q.status] || q.status}</span>
+                  <span className="oc-num">{q.quote_number}</span>
+                </div>
+                <div className="oc-vehicle">{q.vehicle_year} {q.vehicle_model} <span>{q.vehicle_trim}</span></div>
+                <div className="oc-services">{(q.line_items || []).map((l: any) => l.name).join(" · ") || "—"}</div>
+                <div className="oc-meta">
+                  {q.customer_name ? <span>{q.customer_name}</span> : null}
+                  {q.stock_number ? <span>Stock {q.stock_number}</span> : null}
+                  {q.scheduled_date ? <span>Scheduled {q.scheduled_date}</span> : null}
+                  {q.dealer_user_name ? <span>{q.dealer_user_name}</span> : null}
+                </div>
+                <div className="oc-totals">
+                  <div><small>Retail</small><b>{money(q.retail_total)}</b></div>
+                  {session.user.canSeeCost ? <div><small>Your cost</small><b>{money(q.cost_total)}</b></div> : null}
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="tbl-wrap desktop-only">
             <table className="tbl">
               <thead>
                 <tr>

@@ -6,7 +6,10 @@ import type { SessionClaims } from "./types";
 // also testing the dealership side in the same browser.
 const DEALER_COOKIE = process.env.SESSION_COOKIE || "wga_dealer_session";
 const WGA_COOKIE = "wga_admin_session";
-const SESSION_TTL_HOURS = 12;
+// Dealers live on their phones; keep them signed in. WGA side stays short (PIN re-entry is quick).
+const DEALER_TTL_HOURS = 24 * 30;
+const WGA_TTL_HOURS = 12;
+const ttlFor = (kind: "dealer" | "wga") => (kind === "wga" ? WGA_TTL_HOURS : DEALER_TTL_HOURS);
 
 function cookieFor(kind: "dealer" | "wga") {
   return kind === "wga" ? WGA_COOKIE : DEALER_COOKIE;
@@ -26,7 +29,7 @@ export async function createSession(claims: SessionClaims): Promise<string> {
   return await new SignJWT({ ...claims })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_HOURS}h`)
+    .setExpirationTime(`${ttlFor(claims.kind)}h`)
     .sign(getSecret());
 }
 
@@ -58,7 +61,7 @@ export function setSessionCookie(token: string, kind: "dealer" | "wga" = "dealer
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_TTL_HOURS * 60 * 60,
+    maxAge: ttlFor(kind) * 60 * 60,
   });
 }
 

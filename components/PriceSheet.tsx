@@ -19,6 +19,12 @@ export const SHEET_PRINT_CSS = `
     .sheet-svc { break-inside: avoid; }
   }
   @page { margin: 0.5in; }
+  @media (max-width: 720px) {
+    .sheet { padding: 22px 16px !important; }
+    .sheet-letterhead { flex-direction: column; align-items: flex-start !important; gap: 14px; }
+    .sheet-prepared { text-align: left !important; }
+    .sheet-logos img:first-child { height: 34px !important; }
+  }
 `;
 
 const paper = {
@@ -33,15 +39,15 @@ const money = (v: number | null | undefined) => (v === null || v === undefined ?
 
 function Letterhead({ dealership, right }: { dealership: string; right?: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${paper.ink}`, paddingBottom: 18, marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+    <div className="sheet-letterhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${paper.ink}`, paddingBottom: 18, marginBottom: 24 }}>
+      <div className="sheet-logos" style={{ display: "flex", alignItems: "center", gap: 22 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/landrover.png" alt="Land Rover" style={{ height: 44, width: "auto", display: "block", filter: "brightness(0)" }} />
+        <img src="/landrover.png" alt="Land Rover" style={{ height: 44, width: "auto", display: "block" }} />
         <div style={{ width: 1, height: 36, background: paper.rule }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto", display: "block" }} />
       </div>
-      <div style={{ textAlign: "right" }}>
+      <div className="sheet-prepared" style={{ textAlign: "right" }}>
         <div style={{ fontSize: 9, letterSpacing: "0.22em", color: paper.gold, textTransform: "uppercase" }}>Prepared for</div>
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: paper.ink, marginTop: 2 }}>{dealership}</div>
         {right}

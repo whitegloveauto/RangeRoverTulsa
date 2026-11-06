@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 
 export interface MenuLink {
@@ -18,7 +19,9 @@ export interface MenuAction {
 // where the same links live in the top bar).
 export default function SideMenu({ title, subtitle, links, actions }: { title: string; subtitle?: string; links: MenuLink[]; actions: MenuAction[] }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const path = usePathname();
+  useEffect(() => setMounted(true), []);
 
   // close on route change / escape, lock scroll while open
   useEffect(() => setOpen(false), [path]);
@@ -33,11 +36,10 @@ export default function SideMenu({ title, subtitle, links, actions }: { title: s
     };
   }, [open]);
 
-  return (
-    <div className="sidemenu-root">
-      <button className="hamburger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(true)}>
-        <span /><span /><span />
-      </button>
+  // The drawer is portaled to <body>: the header uses backdrop-filter, which would
+  // otherwise trap position:fixed children inside its own stacking context.
+  const drawer = (
+    <>
       <div className={"drawer-bg" + (open ? " open" : "")} onClick={() => setOpen(false)} />
       <aside className={"drawer" + (open ? " open" : "")} aria-hidden={!open}>
         <div className="drawer-head">
@@ -62,6 +64,15 @@ export default function SideMenu({ title, subtitle, links, actions }: { title: s
           ))}
         </div>
       </aside>
+    </>
+  );
+
+  return (
+    <div className="sidemenu-root">
+      <button className="hamburger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(true)}>
+        <span /><span /><span />
+      </button>
+      {mounted ? createPortal(drawer, document.body) : null}
     </div>
   );
 }
