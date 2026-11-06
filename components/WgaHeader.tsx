@@ -13,6 +13,12 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
     router.push("/wga");
   }
 
+  async function viewAsDealer() {
+    const r = await fetch("/api/wga/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "admin" }) });
+    const d = await r.json();
+    if (r.ok) window.open(d.next, "_blank");
+  }
+
   const links = [
     { href: "/wga/orders", label: "Orders" },
     ...(role === "admin"
@@ -43,6 +49,7 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
       <div className="session">
         <span className="pill role">{userName.toUpperCase()}</span>
         <span className="pill">{role === "admin" ? "ADMIN" : "TEAM"}</span>
+        {role === "admin" ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
         <Link href="/wga/pin" className="signout" title="Change PIN">PIN</Link>
         <Link href="/wga/password" className="signout" title="Change password">Password</Link>
         <button className="signout" onClick={signOut}>

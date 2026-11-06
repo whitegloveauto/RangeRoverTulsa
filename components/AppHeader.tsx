@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import CoBrand from "./CoBrand";
 
@@ -16,6 +17,19 @@ export default function AppHeader({
 }) {
   const router = useRouter();
   const path = usePathname();
+  const [viewAs, setViewAs] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setViewAs(d?.viewAs || null))
+      .catch(() => {});
+  }, []);
+
+  async function exitViewAs() {
+    await fetch("/api/wga/view-as", { method: "DELETE" });
+    router.push("/wga/dealerships");
+  }
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -30,6 +44,13 @@ export default function AppHeader({
   ];
 
   return (
+    <>
+    {viewAs ? (
+      <div className="viewas-bar">
+        <span>Viewing as <b>{dealershipName}</b> · {role === "admin" ? "dealer admin" : "sales user"} · signed in as {viewAs} (WGA). Everything here is exactly what they see — orders you submit are real.</span>
+        <button onClick={exitViewAs}>Exit dealer view</button>
+      </div>
+    ) : null}
     <header className="app">
       <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
         <CoBrand size="header" />
@@ -49,5 +70,6 @@ export default function AppHeader({
         </button>
       </div>
     </header>
+    </>
   );
 }

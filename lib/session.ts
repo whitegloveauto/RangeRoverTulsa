@@ -45,6 +45,7 @@ export async function verifySession(token: string): Promise<SessionClaims | null
       userEmail: (payload.userEmail as string) || "",
       role: (payload.role as "admin" | "user") || "user",
       canSeeCost: payload.canSeeCost === undefined ? true : !!payload.canSeeCost,
+      viewAs: (payload.viewAs as string | null) ?? null,
     };
   } catch {
     return null;

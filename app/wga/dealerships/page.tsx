@@ -36,6 +36,17 @@ export default function WgaDealershipsPage() {
     if (ready) load();
   }, [ready]);
 
+  async function viewAs(dealership_id: string, role: "admin" | "user") {
+    setMsg("");
+    const r = await fetch("/api/wga/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dealership_id, role }) });
+    const d = await r.json();
+    if (!r.ok) {
+      setMsg(d.error || "Could not open dealer view.");
+      return;
+    }
+    window.open(d.next, "_blank");
+  }
+
   async function act(body: any) {
     setMsg("");
     const r = await fetch("/api/wga/dealerships", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -71,6 +82,8 @@ export default function WgaDealershipsPage() {
                     <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{d.location} · slug <b style={{ color: "var(--text-2)" }}>{d.slug}</b> · net {d.billing_terms}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn-ghost btn-sm" title="Open the dealer portal exactly as their admin sees it" onClick={() => viewAs(d.id, "admin")}>View as dealer admin</button>
+                    <button className="btn-ghost btn-sm" title="Open the dealer portal exactly as a sales user sees it (cost hidden if they've turned that on)" onClick={() => viewAs(d.id, "user")}>View as sales user</button>
                     <button className="btn-ghost btn-sm" onClick={() => setModal({ kind: "dpw", dealership: d })}>Shared password</button>
                     <button className="btn-primary btn-sm" onClick={() => setModal({ kind: "user", dealership: d })}>+ Add login</button>
                   </div>

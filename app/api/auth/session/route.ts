@@ -12,5 +12,6 @@ export async function GET() {
     authenticated: true,
     dealership: { name: session.name, brand: session.brand, location: session.location },
     user: { name: session.userName, email: session.userEmail, role: session.role, canSeeCost: session.canSeeCost },
+    viewAs: session.viewAs || null,
   });
 }
