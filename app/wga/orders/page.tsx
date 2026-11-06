@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
+import OrderActivity from "@/components/OrderActivity";
 import { useWgaSession } from "@/lib/useDealerSession";
 
 // Live urgency from the deadline: <3 days urgent, <7 soon. Done/cancelled orders aren't urgent.
@@ -151,6 +152,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
               <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onChange={(e) => onPatch({ scheduled_date: e.target.value })} /></div>
               <div className="field"><label>Internal notes</label><input defaultValue={o.internal_notes || ""} placeholder="RO #, parts, etc." onBlur={(e) => e.target.value !== (o.internal_notes || "") && onPatch({ internal_notes: e.target.value })} /></div>
             </div>
+            <div style={{ marginTop: 16 }} onClick={(e) => e.stopPropagation()}><OrderActivity quoteId={o.id} side="wga" /></div>
           </td>
         </tr>
       ) : null}
@@ -217,6 +219,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
             <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onChange={(e) => onPatch({ scheduled_date: e.target.value })} /></div>
             <div className="field"><label>Internal notes</label><input defaultValue={o.internal_notes || ""} placeholder="Parts, notes…" onBlur={(e) => e.target.value !== (o.internal_notes || "") && onPatch({ internal_notes: e.target.value })} /></div>
           </div>
+          <div style={{ marginTop: 16 }}><OrderActivity quoteId={o.id} side="wga" /></div>
         </div>
       ) : null}
     </div>

@@ -32,6 +32,7 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
 
   const links = [
     { href: "/wga/orders", label: "Orders" },
+    { href: "/wga/comebacks", label: "Comebacks" },
     ...(role === "admin"
       ? [
           { href: "/wga/pricing", label: "Pricing" },

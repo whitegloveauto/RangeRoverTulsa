@@ -49,6 +49,7 @@ export default function AppHeader({
     { href: "/portal/vehicle", label: "New Quote" },
     { href: "/portal/orders", label: "Orders" },
     { href: "/portal/master", label: "Master Sheet" },
+    { href: "/portal/comebacks", label: "Comebacks" },
     ...(role === "admin" ? [{ href: "/portal/settings", label: "Settings" }] : []),
   ];
 

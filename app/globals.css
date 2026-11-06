@@ -539,3 +539,30 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
 
 .dealer-switch select { max-width: 180px; text-overflow: ellipsis; }
 @media (max-width: 1180px) { .wga-eyebrow { display: none; } header.app .session .pill.role { display: none; } }
+
+/* ============ ORDER ACTIVITY (QC photos + requests) ============ */
+.activity { display: grid; gap: 18px; }
+.act-section { border: 1px solid var(--stroke); background: var(--surface); padding: 16px 18px; }
+.act-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.act-title { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-3); }
+.act-empty { font-size: 12px; color: var(--text-3); line-height: 1.6; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.photo-grid figure { margin: 0; }
+.photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border: 1px solid var(--stroke); background: #000; }
+.photo-grid figcaption { font-size: 10px; color: var(--text-3); margin-top: 4px; display: flex; justify-content: space-between; gap: 6px; }
+.thread { display: grid; gap: 10px; }
+.msg { padding: 10px 12px; border-left: 2px solid var(--stroke); background: var(--bg); }
+.msg.dealer.request { border-left-color: var(--gold); }
+.msg.wga { border-left-color: var(--gold-dim); }
+.msg-meta { font-size: 11px; color: var(--text-3); }
+.msg-body { font-size: 13px; line-height: 1.6; margin-top: 4px; white-space: pre-wrap; }
+.composer { margin-top: 12px; display: grid; gap: 8px; }
+.composer textarea { width: 100%; background: var(--bg); border: 1px solid var(--stroke); color: var(--text); padding: 10px 12px; font-family: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
+@media print { .activity { display: none !important; } }
+
+.result-row { text-align: left; background: var(--bg); border: 1px solid var(--stroke); color: var(--text); padding: 10px 12px; display: grid; gap: 2px; font-size: 12px; cursor: pointer; }
+.result-row span { color: var(--text-3); font-size: 11px; }
+.result-row:hover { border-color: var(--gold); }
+.picked { border: 1px solid var(--gold-dim); background: rgba(184,153,104,0.08); padding: 10px 12px; font-size: 13px; display: grid; gap: 4px; }
+.notice.ok { border-color: #3f7a55; color: #9fd8b4; }
+@media (max-width: 720px) { .two { grid-template-columns: 1fr !important; } }

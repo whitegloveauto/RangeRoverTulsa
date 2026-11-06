@@ -1,5 +1,7 @@
 "use client";
 
+import OrderActivity from "@/components/OrderActivity";
+
 import Link from "next/link";
 
 import { useEffect, useState } from "react";
@@ -416,6 +418,12 @@ export default function QuoteSheetPage() {
             </div>
           </div>
         </main>
+        {quote.status !== "draft" ? (
+          <section className="no-print" style={{ maxWidth: 780, margin: "0 auto", padding: "0 20px 48px" }}>
+            <div className="stage-eyebrow" style={{ marginBottom: 10 }}>AFTER SUBMITTING</div>
+            <OrderActivity quoteId={String(params.id)} side="dealer" />
+          </section>
+        ) : null}
       </div>
     </>
   );
