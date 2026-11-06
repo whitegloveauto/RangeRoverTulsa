@@ -52,6 +52,18 @@ export async function POST(req: Request) {
         .select("id")
         .single();
       if (error) return fail(error.code === "23505" ? "That slug is already taken." : "Could not create dealership.");
+      // A pre-seeded brand has colors but no catalog yet: clone services + packages from Land Rover so pricing isn't empty.
+      const { count } = await supabaseAdmin.from("dealer_services").select("id", { count: "exact", head: true }).eq("brand_key", brand_key);
+      if (!count) {
+        const { data: svcs } = await supabaseAdmin.from("dealer_services").select("*").eq("brand_key", "land-rover").order("sort_order");
+        for (const svc of svcs || []) {
+          const { id: oldId, created_at, updated_at, ...rest } = svc as any;
+          const { data: ns } = await supabaseAdmin.from("dealer_services").insert({ ...rest, brand: br.make, brand_key, key: `${rest.key}-${brand_key}` }).select("id").single();
+          if (!ns) continue;
+          const { data: items } = await supabaseAdmin.from("dealer_service_items").select("*").eq("service_id", oldId);
+          if (items?.length) await supabaseAdmin.from("dealer_service_items").insert(items.map(({ id, created_at, updated_at, ...it }: any) => ({ ...it, service_id: ns.id })));
+        }
+      }
       // copy WGA cost / suggested retail from a sibling dealership of the same brand
       if (b.copy_pricing_from) {
         const { data: src } = await supabaseAdmin.from("dealer_model_pricing").select("brand, model, item_id, cost, suggested_retail").eq("dealership_id", b.copy_pricing_from);
