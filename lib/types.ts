@@ -12,6 +12,9 @@ export interface Dealership {
 }
 
 export interface DealerService {
+  product_name?: string | null; // e.g. XPEL ULTIMATE PLUS™ (customer packet)
+  blurb?: string | null;
+  facts?: string[];
   id: string;
   brand: string;
   key: string;
@@ -26,6 +29,8 @@ export interface DealerServiceItem {
   service_id: string;
   name: string;
   description: string | null;
+  zones?: string[]; // diagram areas covered (customer packet)
+  blurb?: string | null;
   sort_order: number;
   active: boolean;
 }

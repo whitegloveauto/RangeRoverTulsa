@@ -518,3 +518,6 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .modal { width: calc(100vw - 32px); max-width: none; }
 }
 .user-card select, .oc-actions select, .oc-actions input, .uc-actions select { background: var(--bg); border: 1px solid var(--stroke); color: var(--text); font-family: inherit; font-size: 14px; padding: 10px 12px; border-radius: 1px; outline: none; width: 100%; }
+
+.pkg-chip { background: none; border: 1px solid var(--stroke); color: var(--text-2); font-size: 11px; padding: 6px 10px; border-radius: 999px; cursor: pointer; }
+.pkg-chip.sel { border-color: var(--gold); color: var(--gold-bright); background: rgba(184,153,104,0.12); }

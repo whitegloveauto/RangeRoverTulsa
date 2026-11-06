@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -115,9 +117,14 @@ export default function QuoteSheetPage() {
           <button className="reset" onClick={() => router.back()}>
             ← BACK
           </button>
-          <button className="btn-primary" onClick={() => window.print()}>
-            Print / Save PDF
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link href={`/portal/quote/${params.id}/packet`} className="btn-primary" style={{ textDecoration: "none" }}>
+              Customer packet
+            </Link>
+            <button className="btn-ghost" onClick={() => window.print()}>
+              Print quote
+            </button>
+          </div>
         </div>
 
         <main style={{ display: "flex", justifyContent: "center", padding: "40px 20px" }}>

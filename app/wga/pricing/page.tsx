@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
 import PriceGrid, { type GridChange } from "@/components/PriceGrid";
+import PacketEditor from "@/components/PacketEditor";
 import { useWgaSession } from "@/lib/useDealerSession";
 import type { PricingBook } from "@/lib/types";
 
@@ -106,6 +107,7 @@ export default function WgaPricingPage() {
                 onRemoveItem={(id) => svcAction({ action: "item.delete", id })}
                 onUpdateService={(id, patch) => svcAction({ action: "service.update", id, ...patch })}
               />
+              <PacketEditor book={book} onService={(id, patch) => svcAction({ action: "service.update", id, ...patch })} onItem={(id, patch) => svcAction({ action: "item.update", id, ...patch })} />
             </>
           ) : null}
         </div>

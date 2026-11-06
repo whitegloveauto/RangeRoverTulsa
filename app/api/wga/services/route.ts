@@ -43,6 +43,9 @@ export async function POST(req: Request) {
       if (b.note !== undefined) patch.note = b.note || null;
       if (b.active !== undefined) patch.active = !!b.active;
       if (b.sort_order !== undefined) patch.sort_order = Number(b.sort_order);
+      if (b.product_name !== undefined) patch.product_name = b.product_name || null;
+      if (b.blurb !== undefined) patch.blurb = b.blurb || null;
+      if (b.facts !== undefined) patch.facts = Array.isArray(b.facts) ? b.facts.map((f: any) => String(f).trim()).filter(Boolean) : String(b.facts).split("\n").map((f) => f.trim()).filter(Boolean);
       const { error } = await supabaseAdmin.from("dealer_services").update(patch).eq("id", b.id);
       if (error) return fail("Could not update service.");
       return NextResponse.json({ ok: true });
@@ -66,6 +69,8 @@ export async function POST(req: Request) {
       if (b.description !== undefined) patch.description = b.description || null;
       if (b.active !== undefined) patch.active = !!b.active;
       if (b.sort_order !== undefined) patch.sort_order = Number(b.sort_order);
+      if (b.zones !== undefined) patch.zones = Array.isArray(b.zones) ? b.zones.map(String) : [];
+      if (b.blurb !== undefined) patch.blurb = b.blurb || null;
       const { error } = await supabaseAdmin.from("dealer_service_items").update(patch).eq("id", b.id);
       if (error) return fail("Could not update package.");
       return NextResponse.json({ ok: true });
