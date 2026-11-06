@@ -3,11 +3,13 @@
 import Link from "next/link";
 import SideMenu from "./SideMenu";
 import WgaTheme from "./WgaTheme";
+import { hasPerm } from "@/lib/perms";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 // White Glove Auto admin header.
-export default function WgaHeader({ userName, role }: { userName: string; role: "admin" | "user" }) {
+export default function WgaHeader({ userName, role, perms = [] }: { userName: string; role: "admin" | "user"; perms?: string[] }) {
+  const me = { role, perms };
   const router = useRouter();
   const path = usePathname();
   const [ctx, setCtx] = useState<{ dealerships: any[]; selected: any } | null>(null);
@@ -31,15 +33,12 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
   }
 
   const links = [
-    { href: "/wga/orders", label: "Orders" },
-    { href: "/wga/comebacks", label: "Comebacks" },
-    ...(role === "admin"
-      ? [
-          { href: "/wga/pricing", label: "Pricing" },
-          { href: "/wga/vehicles", label: "Vehicles" },
-          { href: "/wga/dealerships", label: "Dealerships" },
-        ]
-      : []),
+    ...(hasPerm(me, "orders") ? [{ href: "/wga/orders", label: "Orders" }] : []),
+    ...(hasPerm(me, "comebacks") ? [{ href: "/wga/comebacks", label: "Comebacks" }] : []),
+    ...(hasPerm(me, "pricing") ? [{ href: "/wga/pricing", label: "Pricing" }] : []),
+    ...(hasPerm(me, "vehicles") ? [{ href: "/wga/vehicles", label: "Vehicles" }] : []),
+    ...(hasPerm(me, "dealerships") ? [{ href: "/wga/dealerships", label: "Dealerships" }] : []),
+    ...(role === "admin" ? [{ href: "/wga/team", label: "Team" }] : []),
   ];
 
   return (
@@ -70,7 +69,7 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
         ) : null}
         <span className="pill role">{userName.toUpperCase()}</span>
         <span className="pill">{role === "admin" ? "ADMIN" : "TEAM"}</span>
-        {role === "admin" ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
+        {hasPerm(me, "view_as") ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
         <Link href="/wga/pin" className="signout" title="Change PIN">PIN</Link>
         <Link href="/wga/password" className="signout" title="Change password">Password</Link>
         <button className="signout" onClick={signOut}>
@@ -81,7 +80,7 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
         title="White Glove Auto"
         subtitle={`${userName} · ${role === "admin" ? "Admin" : "Team"}`}
         links={[...links, { href: "/wga/pin", label: "Change PIN" }, { href: "/wga/password", label: "Change password" }]}
-        actions={[...(role === "admin" ? [{ label: "View as dealership ↗", onClick: viewAsDealer, accent: true }] : []), { label: "Sign Out", onClick: signOut }]}
+        actions={[...(hasPerm(me, "view_as") ? [{ label: "View as dealership ↗", onClick: viewAsDealer, accent: true }] : []), { label: "Sign Out", onClick: signOut }]}
       />
     </header>
     </>

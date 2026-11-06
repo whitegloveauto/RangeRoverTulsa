@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
@@ -9,8 +9,8 @@ const brandOf = async () => (await selectedDealership())?.brand || "Range Rover"
 
 // GET /api/wga/vehicles — every catalog row (active + inactive) for the admin grid
 export async function GET() {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("vehicles");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const BRAND = await brandOf();
   const { data, error } = await supabaseAdmin
     .from("dealer_vehicles")
@@ -31,8 +31,8 @@ export async function GET() {
 //  model.rename     { model, newName }              renames a model across all years (pricing rows follow)
 //  model.setActive  { model, year?, active }        hide/show a whole model (optionally one year)
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("vehicles");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const BRAND = await brandOf();
   let b: any;
   try {

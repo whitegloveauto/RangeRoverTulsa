@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWgaSession } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { createShopMonkeyTicket } from "@/lib/shopmonkey";
 
 export const runtime = "nodejs";
@@ -9,8 +9,8 @@ const ORDER_STATUSES = ["new", "in_shopmonkey", "scheduled", "in_progress", "com
 
 // GET /api/wga/orders?status=new  — all submitted orders across dealerships
 export async function GET(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("orders");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
 
@@ -31,8 +31,8 @@ export async function GET(req: Request) {
 
 // PATCH /api/wga/orders — { id, status?, assigned_name?, scheduled_date?, internal_notes? }
 export async function PATCH(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("orders");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   let b: any;
   try {
     b = await req.json();

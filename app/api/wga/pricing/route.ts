@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWgaSession, requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { loadPricingBook } from "@/lib/pricingBook";
 import { selectedDealership } from "@/lib/wgaContext";
 
@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 // GET /api/wga/pricing — full WGA pricing book (cost + suggested retail), incl. inactive
 export async function GET() {
-  const s = await getWgaSession();
+  const s = await requireWgaPerm("pricing");
   if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   const d = await selectedDealership();
   if (!d) return NextResponse.json({ error: "No dealership yet." }, { status: 404 });
@@ -18,8 +18,8 @@ export async function GET() {
 
 // PUT /api/wga/pricing — bulk upsert cells: { cells: [{model, item_id, cost, suggested_retail}] }
 export async function PUT(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("pricing");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   let body: { cells?: { model: string; item_id: string; cost: number | null; suggested_retail: number | null }[] };
   try {
     body = await req.json();

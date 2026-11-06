@@ -8,7 +8,7 @@ export async function GET() {
   const st = s.userId ? await portalState(s.userId) : { mustChangePassword: false, hasPin: true };
   return NextResponse.json({
     authenticated: true,
-    user: { name: s.userName, email: s.userEmail, role: s.role },
+    user: { name: s.userName, email: s.userEmail, role: s.role, perms: s.perms || [] },
     mustChangePassword: st.mustChangePassword,
     hasPin: st.hasPin,
   });

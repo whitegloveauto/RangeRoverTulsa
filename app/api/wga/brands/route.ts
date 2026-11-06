@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { DEFAULT_THEME } from "@/lib/theme";
 
 export const runtime = "nodejs";
@@ -8,8 +8,8 @@ const BUCKET = "dealer-assets";
 
 // GET — all manufacturer brand profiles
 export async function GET() {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("dealerships");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const { data } = await supabaseAdmin.from("dealer_brands").select("*").order("name");
   return NextResponse.json({ brands: data || [] });
 }
@@ -17,8 +17,8 @@ export async function GET() {
 // POST JSON  { key, name, make, tagline?, theme? (partial), copy_catalog_from? }  — create or update a brand
 // POST multipart { key, file } — upload the brand badge
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("dealerships");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const ct = req.headers.get("content-type") || "";
 
   if (ct.includes("multipart/form-data")) {

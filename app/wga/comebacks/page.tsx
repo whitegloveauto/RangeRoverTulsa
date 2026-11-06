@@ -29,7 +29,7 @@ export default function WgaComebacksPage() {
   if (!ready || !session) return <div className="frame"><main><div className="loading-stage"><div className="loading-text">Loading…</div></div></main></div>;
   return (
     <div className="frame">
-      <WgaHeader userName={session.user.name} role={session.user.role} />
+      <WgaHeader userName={session.user.name} role={session.user.role} perms={session.user.perms} />
       <main>
         <div className="stage" style={{ maxWidth: 1100 }}>
           <div className="stage-head">

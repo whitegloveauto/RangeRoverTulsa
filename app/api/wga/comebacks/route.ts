@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWgaSession } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 
 export const runtime = "nodejs";
 const STATUSES = ["open", "scheduled", "resolved", "declined"];
 
 // GET ?status= — comebacks across all dealerships
 export async function GET(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("comebacks");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   const status = new URL(req.url).searchParams.get("status");
   let q = supabaseAdmin
     .from("dealer_comebacks")
@@ -23,8 +23,8 @@ export async function GET(req: Request) {
 
 // PATCH { id, status?, scheduled_date?, wga_notes?, sm_order_number? }
 export async function PATCH(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("comebacks");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   const b = await req.json().catch(() => ({}));
   if (!b.id) return NextResponse.json({ error: "Missing id." }, { status: 400 });
   const patch: any = { updated_at: new Date().toISOString() };

@@ -30,7 +30,7 @@ export function useDealerSession() {
 }
 
 export interface WgaSessionInfo {
-  user: { name: string; email: string; role: "admin" | "user" };
+  user: { name: string; email: string; role: "admin" | "user"; perms: string[] };
   mustChangePassword: boolean;
   hasPin: boolean;
 }

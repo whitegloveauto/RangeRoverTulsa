@@ -31,7 +31,10 @@ export async function loadProfile(email: string): Promise<WgaProfile | string> {
   const { data: profile } = await supabaseAdmin.from("profiles").select("id, email, full_name, role, active, access_dealer_deals").eq("email", email).maybeSingle();
   if (!profile || !profile.active) return "No active White Glove account for this email.";
   const isAdmin = profile.role === "admin";
-  if (!isAdmin && !profile.access_dealer_deals) return "You don't have access to the dealer program.";
+  if (!isAdmin && !profile.access_dealer_deals) {
+    const { data: acc } = await supabaseAdmin.from("wga_portal_access").select("user_id").eq("user_id", profile.id).maybeSingle();
+    if (!acc) return "You don't have access to the dealer program yet — ask Myron to add you on the Team page.";
+  }
   return { id: profile.id, email: profile.email, full_name: profile.full_name, role: isAdmin ? "admin" : "user" };
 }
 
@@ -52,6 +55,7 @@ export function nextPath(p: WgaProfile, st: { mustChangePassword: boolean; hasPi
   if (!st.hasPin) return "/wga/pin?setup=1";
   return p.role === "admin" ? "/wga/pricing" : "/wga/orders";
 }
+// (orders is the safe default landing; a person without that permission gets bounced by the page gate)
 
 export async function issueSession(p: WgaProfile) {
   const token = await createSession({

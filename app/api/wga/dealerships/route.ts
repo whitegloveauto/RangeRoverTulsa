@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 
 export const runtime = "nodejs";
 
 // GET — dealerships + their users
 export async function GET() {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("dealerships");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const [d, u] = await Promise.all([
     supabaseAdmin.from("dealer_dealerships").select("id, slug, name, short_name, brand, brand_key, hostnames, logo_url, theme_override, location, billing_terms, active, hide_cost_from_users, created_at").order("name"),
     supabaseAdmin.from("dealer_users").select("id, dealership_id, email, name, role, active, must_change_password, last_login_at").order("name"),
@@ -25,8 +25,8 @@ export async function GET() {
 //  user.update         {id, name?, role?, active?}
 //  user.password       {id, password}
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("dealerships");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   let b: any;
   try {
     b = await req.json();

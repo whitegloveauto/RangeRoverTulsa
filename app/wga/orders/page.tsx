@@ -55,7 +55,7 @@ export default function WgaOrdersPage() {
 
   return (
     <div className="frame">
-      <WgaHeader userName={session.user.name} role={session.user.role} />
+      <WgaHeader userName={session.user.name} role={session.user.role} perms={session.user.perms} />
       <main>
         <div className="stage" style={{ maxWidth: 1240 }}>
           <div className="stage-head">

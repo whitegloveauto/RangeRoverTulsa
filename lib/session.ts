@@ -1,6 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { SessionClaims } from "./types";
+import { supabaseAdmin } from "./supabase";
+import { ALL_PERMS, DEFAULT_PERMS, hasPerm } from "./perms";
 
 // Two independent cookies so a WGA admin can be signed in to their side while
 // also testing the dealership side in the same browser.
@@ -83,18 +85,31 @@ export async function getSession(): Promise<SessionClaims | null> {
   return s && s.kind === "dealer" ? s : null;
 }
 
-// White Glove Auto session (admin or team).
+// White Glove Auto session (admin or team). Permissions are read live so a change on /wga/team
+// applies on the person's next click, not their next sign-in.
 export async function getWgaSession(): Promise<SessionClaims | null> {
   const token = cookies().get(WGA_COOKIE)?.value;
   if (!token) return null;
   const s = await verifySession(token);
-  return s && s.kind === "wga" ? s : null;
+  if (!s || s.kind !== "wga") return null;
+  if (s.role === "admin") return { ...s, perms: ALL_PERMS };
+  if (s.userId) {
+    const { data } = await supabaseAdmin.from("wga_portal_access").select("perms").eq("user_id", s.userId).maybeSingle();
+    s.perms = data?.perms ?? DEFAULT_PERMS;
+  }
+  return s;
 }
 
-// WGA admins only (pricing edits, dealership management).
+// WGA admins only (team management).
 export async function requireWgaAdmin(): Promise<SessionClaims | null> {
   const s = await getWgaSession();
   return s && s.role === "admin" ? s : null;
+}
+
+// Anyone on the WGA side holding a specific permission (admins always pass).
+export async function requireWgaPerm(perm: string): Promise<SessionClaims | null> {
+  const s = await getWgaSession();
+  return s && hasPerm(s, perm) ? s : null;
 }
 
 export { DEALER_COOKIE as COOKIE_NAME };

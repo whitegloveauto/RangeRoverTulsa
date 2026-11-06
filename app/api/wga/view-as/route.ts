@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin, createSession, setSessionCookie, clearSessionCookie } from "@/lib/session";
+import { requireWgaPerm, createSession, setSessionCookie, clearSessionCookie } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 // Issues a normal dealer session cookie (separate from the WGA cookie) tagged viewAs, so the
 // dealer pages render exactly what the dealership sees. Orders placed while viewing are real.
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("view_as");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   let b: any;
   try {
     b = await req.json();

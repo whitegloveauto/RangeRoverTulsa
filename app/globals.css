@@ -569,3 +569,9 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
 
 .move-btns { display: inline-flex; gap: 2px; }
 .move-btns .link-btn { padding: 2px 6px; font-size: 10px; }
+.perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 12px; }
+.perm { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--stroke-soft); background: var(--bg); cursor: pointer; }
+.perm.on { border-color: var(--gold-dim); background: rgba(142,197,232,0.06); }
+.perm input { grid-row: span 2; accent-color: var(--gold); width: 16px; height: 16px; }
+.perm span { font-size: 13px; }
+.perm small { font-size: 10.5px; color: var(--text-3); line-height: 1.4; }

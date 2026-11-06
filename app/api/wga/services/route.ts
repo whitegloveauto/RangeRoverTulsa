@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
@@ -13,8 +13,8 @@ export const runtime = "nodejs";
 //  item.update     {id, name?, description?, active?, sort_order?}
 //  item.delete     {id}  (removes pricing for it too, via cascade)
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("pricing");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   let b: any;
   try {
     b = await req.json();

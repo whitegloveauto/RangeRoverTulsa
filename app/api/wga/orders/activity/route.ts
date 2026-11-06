@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWgaSession } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { loadActivity, uploadOrderPhoto, deleteOrderPhoto } from "@/lib/orderActivity";
 
 export const runtime = "nodejs";
 
 // GET ?quote_id= — photos + thread (WGA)
 export async function GET(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("orders");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   const quoteId = new URL(req.url).searchParams.get("quote_id") || "";
   if (!quoteId) return NextResponse.json({ error: "quote_id required" }, { status: 400 });
   return NextResponse.json(await loadActivity(quoteId));
@@ -17,8 +17,8 @@ export async function GET(req: Request) {
 // POST multipart { quote_id, files[] (QC photos), caption? }
 // POST JSON { quote_id, action: "reply", body } | { action: "resolve", message_id } | { action: "delete_photo", photo_id }
 export async function POST(req: Request) {
-  const s = await getWgaSession();
-  if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const s = await requireWgaPerm("orders");
+  if (!s) return NextResponse.json({ error: "No access." }, { status: 403 });
   const ct = req.headers.get("content-type") || "";
   try {
     if (ct.includes("multipart/form-data")) {

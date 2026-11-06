@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
+import { hasPerm } from "@/lib/perms";
 import PriceGrid, { type GridChange } from "@/components/PriceGrid";
 import PacketEditor from "@/components/PacketEditor";
 import { useWgaSession } from "@/lib/useDealerSession";
@@ -64,10 +65,10 @@ export default function WgaPricingPage() {
   }
 
   if (!ready || !session) return <div className="frame"><main><div className="loading-stage"><div className="loading-text">Loading…</div></div></main></div>;
-  if (session.user.role !== "admin") {
+  if (!hasPerm(session.user, "pricing")) {
     return (
       <div className="frame">
-        <WgaHeader userName={session.user.name} role={session.user.role} />
+        <WgaHeader userName={session.user.name} role={session.user.role} perms={session.user.perms} />
         <main><div className="stage"><div className="notice warn">Pricing is editable by WGA admins only.</div></div></main>
       </div>
     );
@@ -75,7 +76,7 @@ export default function WgaPricingPage() {
 
   return (
     <div className="frame">
-      <WgaHeader userName={session.user.name} role={session.user.role} />
+      <WgaHeader userName={session.user.name} role={session.user.role} perms={session.user.perms} />
       <main>
         <div className="stage" style={{ maxWidth: 1240 }}>
           <div className="stage-head">

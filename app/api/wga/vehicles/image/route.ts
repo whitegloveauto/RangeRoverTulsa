@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { requireWgaAdmin } from "@/lib/session";
+import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
@@ -9,8 +9,8 @@ const BUCKET = "dealer-assets";
 
 // GET — { images: { [model]: url } }
 export async function GET() {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("vehicles");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const BRAND = await brandOf();
   const { data } = await supabaseAdmin.from("dealer_model_images").select("model, image_url").eq("brand", BRAND);
   const images: Record<string, string> = {};
@@ -20,8 +20,8 @@ export async function GET() {
 
 // POST multipart { model, file } — upload/replace the photo used on the customer packet for this model
 export async function POST(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("vehicles");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const BRAND = await brandOf();
   const form = await req.formData();
   const model = String(form.get("model") || "").trim();
@@ -42,8 +42,8 @@ export async function POST(req: Request) {
 
 // DELETE { model } — remove the photo (packet falls back to the diagram)
 export async function DELETE(req: Request) {
-  const s = await requireWgaAdmin();
-  if (!s) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  const s = await requireWgaPerm("vehicles");
+  if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
   const BRAND = await brandOf();
   const { model } = await req.json().catch(() => ({}));
   if (!model) return NextResponse.json({ error: "Model required." }, { status: 400 });
