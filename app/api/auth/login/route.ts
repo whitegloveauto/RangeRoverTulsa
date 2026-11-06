@@ -25,6 +25,12 @@ export async function POST(req: Request) {
 
   const genericFail = NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
 
+  // A White Glove Auto staff account on the dealership form — point them to the admin sign-in.
+  if (email) {
+    const { data: staff } = await supabaseAdmin.from("profiles").select("id").eq("email", email).maybeSingle();
+    if (staff) return NextResponse.json({ error: "That's a White Glove Auto account — sign in at /wga instead.", wga: true }, { status: 401 });
+  }
+
   const { data: dealership, error } = await supabaseAdmin
     .from("dealer_dealerships")
     .select("id, slug, name, brand, location, password_hash, active, hide_cost_from_users")

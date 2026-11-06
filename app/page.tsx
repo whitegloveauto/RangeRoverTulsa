@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CoBrand from "@/components/CoBrand";
@@ -39,6 +41,10 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.wga) {
+          router.push("/wga");
+          return;
+        }
         setError(data.error || "Sign-in failed.");
         setBusy(false);
         return;
@@ -84,6 +90,9 @@ export default function LoginPage() {
           <div className="login-meta">
             AUTHORIZED FOR &nbsp; <span>RANGE ROVER · TULSA</span>
           </div>
+          <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.12em" }}>
+            <Link href="/wga" style={{ color: "var(--text-3)" }}>WHITE GLOVE AUTO STAFF →</Link>
+          </p>
         </div>
       </main>
     </div>
