@@ -19,6 +19,19 @@ export const SHEET_PRINT_CSS = `
     .sheet-svc { break-inside: avoid; }
   }
   @page { margin: 0.5in; }
+  .ms-stack { display: none; }
+  @media screen and (max-width: 720px) {
+    .sheet.master .ms-table { display: none; }
+    .ms-stack { display: block; }
+    .ms-model { padding: 10px 0; border-bottom: 1px solid #DDD9CF; }
+    .ms-model-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: #0C1A14; margin-bottom: 4px; }
+    .ms-pkgs { display: grid; gap: 4px 14px; font-size: 12.5px; align-items: baseline; }
+    .ms-pkgs .ms-h { font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #777; }
+    .ms-pkgs .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ms-pkgs .muted { color: #666; }
+    .ms-pkgs .strong { color: #0C1A14; font-weight: 600; }
+    .ms-pkgs .ms-pkg { color: #333; }
+  }
   @media (max-width: 720px) {
     .sheet { padding: 22px 16px !important; }
     .sheet-letterhead { flex-direction: column; align-items: flex-start !important; gap: 14px; }
@@ -138,8 +151,11 @@ export function VehicleSheet({
 export function MasterSheet({ book, dealership, showCost, showSuggested }: { book: PricingBook; dealership: string; showCost: boolean; showSuggested: boolean }) {
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const cols = 1 + (showCost ? 1 : 0) + (showSuggested ? 1 : 0);
+  const maxCols = Math.max(0, ...book.services.map((svc) => svc.items.length * cols));
+  const wide = maxCols > 6; // too many columns for a portrait page
   return (
-    <div className="sheet" style={{ width: "100%", maxWidth: 1040, background: "#fff", color: "#1A1A1A", padding: "44px 48px 36px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", margin: "0 auto" }}>
+    <div className={"sheet master" + (wide ? " wide" : "")} style={{ width: "100%", maxWidth: wide ? 1240 : 1040, background: "#fff", color: "#1A1A1A", padding: "44px 48px 36px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", margin: "0 auto" }}>
+      {wide ? <style>{`@media print { @page { size: landscape; margin: 0.4in; } .sheet.wide table { font-size: 10px !important; } }`}</style> : null}
       <Letterhead dealership={dealership} right={<div style={{ fontSize: 10, color: paper.muted, marginTop: 4 }}>Master price sheet · {dateStr}</div>} />
       {book.services.map((svc) => (
         <div key={svc.id} className="sheet-svc" style={{ marginBottom: 26 }}>
@@ -147,7 +163,7 @@ export function MasterSheet({ book, dealership, showCost, showSuggested }: { boo
             <div style={{ fontSize: 11, letterSpacing: "0.2em", color: paper.ink, fontWeight: 700, textTransform: "uppercase" }}>{svc.name}</div>
             {svc.note ? <div style={{ fontSize: 9, letterSpacing: "0.16em", color: paper.gold, textTransform: "uppercase" }}>{svc.note}</div> : null}
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+          <table className="ms-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", fontWeight: 500, fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: paper.muted, padding: "6px 0", borderBottom: `1px solid ${paper.rule}` }}>Model</th>
@@ -188,6 +204,31 @@ export function MasterSheet({ book, dealership, showCost, showSuggested }: { boo
               ))}
             </tbody>
           </table>
+          {/* Phones (screen only): one block per model, packages listed underneath */}
+          <div className="ms-stack">
+            {book.models.map((m) => (
+              <div key={m} className="ms-model">
+                <div className="ms-model-name">{m}</div>
+                <div className="ms-pkgs" style={{ gridTemplateColumns: `1fr ${showCost ? "auto " : ""}${showSuggested ? "auto " : ""}auto` }}>
+                  <span className="ms-h">Package</span>
+                  {showCost ? <span className="ms-h r">Cost</span> : null}
+                  {showSuggested ? <span className="ms-h r">Sugg.</span> : null}
+                  <span className="ms-h r">Price</span>
+                  {svc.items.map((it) => {
+                    const c = book.prices[m]?.[it.id];
+                    return (
+                      <Fragment key={it.id}>
+                        <span className="ms-pkg">{it.name}</span>
+                        {showCost ? <span className="r muted">{money(c?.cost)}</span> : null}
+                        {showSuggested ? <span className="r muted">{money(c?.suggested_retail)}</span> : null}
+                        <span className="r strong">{money(c?.retail)}</span>
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
       <Footer />
