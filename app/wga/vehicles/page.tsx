@@ -145,6 +145,10 @@ export default function WgaVehiclesPage() {
                     <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{year} · {trims.filter((t) => t.active).length} of {trims.length} trims active</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span className="move-btns">
+                      <button className="btn-ghost btn-sm" disabled={busy} title="Move up" onClick={() => act({ action: "model.move", model, dir: -1 })}>▲</button>
+                      <button className="btn-ghost btn-sm" disabled={busy} title="Move down" onClick={() => act({ action: "model.move", model, dir: 1 })}>▼</button>
+                    </span>
                     <button className="btn-ghost btn-sm" disabled={busy} onClick={() => {
                       const newName = prompt(`Rename "${model}" across all years (pricing follows the new name):`, model);
                       if (newName && newName.trim() !== model) act({ action: "model.rename", model, newName: newName.trim() });

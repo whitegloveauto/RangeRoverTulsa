@@ -101,6 +101,22 @@ export async function POST(req: Request) {
       await supabaseAdmin.from("dealer_retail_prices").update({ model: newName }).eq("model", model);
       return NextResponse.json({ ok: true });
     }
+    // model.move {model, dir: -1|1} — reorder models (applies across all years; this is the order dealers and the grids see)
+    case "model.move": {
+      const model = clean(b.model);
+      const dir = Number(b.dir) < 0 ? -1 : 1;
+      if (!model) return fail("Model is required.", 400);
+      const { data: rows } = await supabaseAdmin.from("dealer_vehicles").select("model, sort_order").eq("brand", BRAND);
+      const order = new Map<string, number>();
+      for (const r of rows || []) if (!order.has(r.model)) order.set(r.model, r.sort_order ?? 0);
+      const models = Array.from(order.entries()).sort((a, b2) => a[1] - b2[1] || a[0].localeCompare(b2[0])).map(([m]) => m);
+      const i = models.indexOf(model);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= models.length) return NextResponse.json({ ok: true, moved: false });
+      [models[i], models[j]] = [models[j], models[i]];
+      await Promise.all(models.map((m, k) => supabaseAdmin.from("dealer_vehicles").update({ sort_order: (k + 1) * 10 }).eq("brand", BRAND).eq("model", m)));
+      return NextResponse.json({ ok: true, moved: true });
+    }
     case "model.setActive": {
       const model = clean(b.model);
       if (!model) return fail("Model is required.", 400);
