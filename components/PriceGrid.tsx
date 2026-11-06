@@ -20,6 +20,7 @@ export default function PriceGrid({
   onRemoveItem,
   onToggleItem,
   onUpdateService,
+  onMove,
   showInactive,
 }: {
   book: PricingBook;
@@ -30,6 +31,7 @@ export default function PriceGrid({
   onRemoveItem?: (itemId: string) => Promise<void>;
   onToggleItem?: (itemId: string, active: boolean) => Promise<void>;
   onUpdateService?: (serviceId: string, patch: { name?: string; note?: string; active?: boolean }) => Promise<void>;
+  onMove?: (kind: "service" | "item", id: string, dir: -1 | 1) => Promise<void>;
   showInactive?: boolean;
 }) {
   const [local, setLocal] = useState<Record<string, Record<string, Cell>>>({});
@@ -96,6 +98,12 @@ export default function PriceGrid({
               <>
                 <input className="title" defaultValue={svc.name} aria-label="Service name" onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== svc.name) onUpdateService(svc.id, { name: v }); }} />
                 <input className="note" placeholder="NOTE (FILM LINE, WARRANTY…)" defaultValue={svc.note || ""} aria-label="Service note" onBlur={(e) => { if ((e.target.value || "") !== (svc.note || "")) onUpdateService(svc.id, { note: e.target.value }); }} />
+                {onMove ? (
+                  <span className="move-btns">
+                    <button className="link-btn" title="Move service up" onClick={() => onMove("service", svc.id, -1)}>▲</button>
+                    <button className="link-btn" title="Move service down" onClick={() => onMove("service", svc.id, 1)}>▼</button>
+                  </span>
+                ) : null}
                 <button className="link-btn" onClick={() => onUpdateService(svc.id, { active: !svc.active })}>{svc.active ? "hide service" : "show service"}</button>
               </>
             ) : (
@@ -140,6 +148,12 @@ export default function PriceGrid({
                               if (v && v !== it.name) onRenameItem(it.id, v);
                             }}
                           />
+                          {onMove ? (
+                            <span className="move-btns">
+                              <button className="link-btn" title="Move left" onClick={() => onMove("item", it.id, -1)}>◀</button>
+                              <button className="link-btn" title="Move right" onClick={() => onMove("item", it.id, 1)}>▶</button>
+                            </span>
+                          ) : null}
                           {onToggleItem ? (
                             <button className="link-btn" title={it.active ? "Hide from dealers" : "Show to dealers"} onClick={() => onToggleItem(it.id, !it.active)}>
                               {it.active ? "hide" : "show"}

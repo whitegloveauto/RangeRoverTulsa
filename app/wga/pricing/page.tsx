@@ -106,6 +106,7 @@ export default function WgaPricingPage() {
                 onToggleItem={(id, active) => svcAction({ action: "item.update", id, active })}
                 onRemoveItem={(id) => svcAction({ action: "item.delete", id })}
                 onUpdateService={(id, patch) => svcAction({ action: "service.update", id, ...patch })}
+                onMove={(kind, id, dir) => svcAction({ action: kind === "service" ? "service.move" : "item.move", id, dir })}
               />
               <PacketEditor book={book} onService={(id, patch) => svcAction({ action: "service.update", id, ...patch })} onItem={(id, patch) => svcAction({ action: "item.update", id, ...patch })} />
             </>

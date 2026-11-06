@@ -85,6 +85,25 @@ export async function POST(req: Request) {
       if (error) return fail("Could not delete package.");
       return NextResponse.json({ ok: true });
     }
+    // service.move {id, dir: -1|1} / item.move {id, dir} — swap sort_order with the neighbour
+    case "service.move":
+    case "item.move": {
+      const table = b.action === "service.move" ? "dealer_services" : "dealer_service_items";
+      const dir = Number(b.dir) < 0 ? -1 : 1;
+      const { data: me } = await supabaseAdmin.from(table).select("id, sort_order, " + (table === "dealer_services" ? "brand_key, brand" : "service_id")).eq("id", b.id).maybeSingle();
+      if (!me) return fail("Not found.", 404);
+      // siblings in display order; renumber 10,20,30… so every row has a distinct position
+      let sq = supabaseAdmin.from(table).select("id, sort_order").order("sort_order").order("created_at");
+      sq = table === "dealer_services" ? sq.eq("brand", (me as any).brand) : sq.eq("service_id", (me as any).service_id);
+      const { data: sib } = await sq;
+      const ids = (sib || []).map((r) => r.id);
+      const i = ids.indexOf(b.id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= ids.length) return NextResponse.json({ ok: true, moved: false });
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      await Promise.all(ids.map((id, k) => supabaseAdmin.from(table).update({ sort_order: (k + 1) * 10 }).eq("id", id)));
+      return NextResponse.json({ ok: true, moved: true });
+    }
     default:
       return fail("Unknown action.", 400);
   }
