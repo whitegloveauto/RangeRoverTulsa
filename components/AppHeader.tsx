@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import CoBrand from "./CoBrand";
+import SideMenu from "./SideMenu";
 
 // Dealership-side header with navigation. Settings only shows for dealer admins.
 export default function AppHeader({
@@ -69,6 +70,12 @@ export default function AppHeader({
           Sign Out
         </button>
       </div>
+      <SideMenu
+        title={dealershipName}
+        subtitle={userName ? `${userName} · ${role === "admin" ? "Dealer admin" : "Sales"}` : undefined}
+        links={links}
+        actions={[...(viewAs ? [{ label: "Exit dealer view", onClick: exitViewAs, accent: true }] : []), { label: "Sign Out", onClick: signOut }]}
+      />
     </header>
     </>
   );

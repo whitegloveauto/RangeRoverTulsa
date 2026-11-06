@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SideMenu from "./SideMenu";
 import { usePathname, useRouter } from "next/navigation";
 
 // White Glove Auto admin header.
@@ -56,6 +57,12 @@ export default function WgaHeader({ userName, role }: { userName: string; role: 
           Sign Out
         </button>
       </div>
+      <SideMenu
+        title="White Glove Auto"
+        subtitle={`${userName} · ${role === "admin" ? "Admin" : "Team"}`}
+        links={[...links, { href: "/wga/pin", label: "Change PIN" }, { href: "/wga/password", label: "Change password" }]}
+        actions={[...(role === "admin" ? [{ label: "View as dealership ↗", onClick: viewAsDealer, accent: true }] : []), { label: "Sign Out", onClick: signOut }]}
+      />
     </header>
   );
 }
