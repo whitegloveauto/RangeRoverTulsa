@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
 import OrderActivity from "@/components/OrderActivity";
 import { useWgaSession } from "@/lib/useDealerSession";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 // Live urgency from the deadline: <3 days urgent, <7 soon. Done/cancelled orders aren't urgent.
 function dueInfo(o: any): { label: string; cls: string } | null {
@@ -30,14 +31,18 @@ const STATUSES = [
 
 export default function WgaOrdersPage() {
   const { session, ready } = useWgaSession();
-  const [filter, setFilter] = useState("new");
+  const [filter, setFilter] = useState("open");
+  const isPhone = useIsPhone();
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
   async function load(f = filter) {
-    const r = await fetch("/api/wga/orders?status=" + f);
-    if (r.ok) setRows((await r.json()).orders || []);
+    // "open" = everything not finished; the API filters single statuses, so fetch all and trim here
+    const r = await fetch("/api/wga/orders?status=" + (f === "open" ? "all" : f));
+    if (!r.ok) return;
+    const all = (await r.json()).orders || [];
+    setRows(f === "open" ? all.filter((o: any) => !["complete", "cancelled"].includes(o.status)) : all);
   }
   useEffect(() => {
     if (ready) load(filter);
@@ -64,21 +69,21 @@ export default function WgaOrdersPage() {
             <div className="stage-sub">Orders submitted from the dealership portal. Move each one through ShopMonkey → scheduled → complete. Trim is on every order so patterns get cut for the right variant.</div>
           </div>
           <div className="tabs">
-            {[["new", "New"], ["in_shopmonkey", "In ShopMonkey"], ["scheduled", "Scheduled"], ["in_progress", "In progress"], ["complete", "Complete"], ["all", "All"]].map(([k, l]) => (
+            {[["open", "Open"], ["new", "New"], ["in_shopmonkey", "In ShopMonkey"], ["scheduled", "Scheduled"], ["in_progress", "In progress"], ["complete", "Complete"], ["all", "All"]].map(([k, l]) => (
               <button key={k} className={filter === k ? "active" : ""} onClick={() => setFilter(k)}>{l}</button>
             ))}
           </div>
           {msg ? <div className="notice warn">{msg}</div> : null}
 
           {/* Phones: one card per order, tap to expand actions */}
-          <div className="order-cards">
+          {isPhone ? <div className="order-cards">
             {rows.length === 0 ? <div className="card" style={{ textAlign: "center" }}>Nothing here.</div> : null}
             {rows.map((o) => (
               <OrderCard key={o.id} o={o} open={open === o.id} onToggle={() => setOpen(open === o.id ? null : o.id)} onPatch={(b) => patch(o.id, b)} />
             ))}
-          </div>
+          </div> : null}
 
-          <div className="tbl-wrap desktop-only">
+          {!isPhone ? <div className="tbl-wrap desktop-only">
             <table className="tbl">
               <thead>
                 <tr><th>Submitted</th><th>Due</th><th>Quote #</th><th>RO #</th><th>Dealership</th><th>Vehicle</th><th>Services</th><th>Status</th><th>Assigned</th><th style={{ textAlign: "right" }}>WGA bills</th><th style={{ textAlign: "right" }}>Dealer retail</th></tr>
@@ -90,7 +95,7 @@ export default function WgaOrdersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div> : null}
         </div>
       </main>
     </div>

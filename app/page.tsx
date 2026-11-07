@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [tenant, setTenant] = useState<any>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     fetch("/api/tenant").then((r) => (r.ok ? r.json() : null)).then(setTenant).catch(() => {});
@@ -93,7 +94,15 @@ export default function LoginPage() {
           <div className="login-meta">
             AUTHORIZED FOR &nbsp; <span>{(tenant?.dealership?.name || "").toUpperCase()}</span>
           </div>
-          <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.12em" }}>
+          <p style={{ marginTop: 18, fontSize: 12 }}>
+            <button type="button" className="link-btn" onClick={() => setShowHelp((v) => !v)}>Forgot your password?</button>
+          </p>
+          {showHelp ? (
+            <div className="notice" style={{ textAlign: "left", maxWidth: 420, margin: "10px auto 0" }}>
+              Your dealership admin can reset it from <b>Settings → Team logins</b> in about ten seconds. If you&apos;re the admin, White Glove Auto can reset yours — call or text the shop.
+            </div>
+          ) : null}
+          <p style={{ marginTop: 22, fontSize: 11, letterSpacing: "0.12em" }}>
             <Link href="/wga" style={{ color: "var(--text-3)" }}>WHITE GLOVE AUTO STAFF →</Link>
           </p>
         </div>

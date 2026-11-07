@@ -31,7 +31,16 @@ export default function VehiclePage() {
 
       const vehRes = await fetch("/api/vehicles");
       if (vehRes.ok) {
-        setCatalog(await vehRes.json());
+        const cat: VehicleCatalog = await vehRes.json();
+        setCatalog(cat);
+        // start on the year they used last time (or the newest)
+        try {
+          const last = Number(localStorage.getItem("wga_last_year") || "");
+          if (cat.years.includes(last)) setYear(last);
+          else if (cat.years.length) setYear(cat.years[0]);
+        } catch {
+          if (cat.years.length) setYear(cat.years[0]);
+        }
       }
       setLoading(false);
     })();
@@ -46,6 +55,9 @@ export default function VehiclePage() {
     setYear(v ? Number(v) : "");
     setModel("");
     setTrim("");
+    try {
+      if (v) localStorage.setItem("wga_last_year", v);
+    } catch {}
   }
   function handleModel(v: string) {
     setModel(v);
@@ -114,6 +126,9 @@ export default function VehiclePage() {
             </p>
           </div>
 
+          {catalog && catalog.years.length === 0 ? (
+            <div className="notice warn">No vehicles are set up for this dealership yet. White Glove Auto adds the model lineup from their side — give them a call and this screen fills in.</div>
+          ) : null}
           <div className="picker-grid">
             <div className="field">
               <label htmlFor="sel-year">Year</label>
@@ -165,6 +180,22 @@ export default function VehiclePage() {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* Phones: tap-to-pick chips instead of dropdowns */}
+          <div className="picker-chips">
+            <div className="chip-row">
+              <span className="chip-label">Year</span>
+              {catalog?.years.map((y) => <button key={y} className={"chip " + (year === y ? "on" : "")} onClick={() => handleYear(String(y))}>{y}</button>)}
+            </div>
+            <div className="chip-row">
+              <span className="chip-label">Model</span>
+              {year ? models.map((m) => <button key={m} className={"chip " + (model === m ? "on" : "")} onClick={() => handleModel(m)}>{m}</button>) : <span className="chip-hint">Pick a year</span>}
+            </div>
+            <div className="chip-row">
+              <span className="chip-label">Trim</span>
+              {model ? trims.map((t) => <button key={t} className={"chip " + (trim === t ? "on" : "")} onClick={() => setTrim(t)}>{t}</button>) : <span className="chip-hint">Pick a model</span>}
             </div>
           </div>
 

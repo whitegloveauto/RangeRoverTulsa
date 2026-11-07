@@ -17,7 +17,7 @@ export default async function PublicPacketPage({ params }: { params: { token: st
   return (
     <div className="frame">
       {tenant ? <ThemeStyle theme={tenant.theme} /> : null}
-      <style>{PACKET_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: PACKET_CSS }} />
       <main style={{ padding: "24px 12px 48px" }}>
         <CustomerPacket data={data} />
         <p className="no-print" style={{ textAlign: "center", fontSize: 11, color: "var(--text-3)", marginTop: 18 }}>

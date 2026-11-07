@@ -29,7 +29,7 @@ export const ZONES: { id: string; label: string }[] = [
 
 type Family = "fullsize" | "sport" | "coupe" | "boxy";
 export function familyFor(model: string): Family {
-  const m = model.toLowerCase();
+  const m = String(model || "").toLowerCase();
   if (m.includes("defender")) return "boxy";
   if (m.includes("velar") || m.includes("evoque")) return "coupe";
   if (m.includes("sport") || m.includes("discovery sport")) return "sport";

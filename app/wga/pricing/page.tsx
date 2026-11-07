@@ -69,7 +69,7 @@ export default function WgaPricingPage() {
     return (
       <div className="frame">
         <WgaHeader userName={session.user.name} role={session.user.role} perms={session.user.perms} />
-        <main><div className="stage"><div className="notice warn">Pricing is editable by WGA admins only.</div></div></main>
+        <main><div className="stage"><div className="notice warn">You don&apos;t have access to pricing. Ask an admin on the Team page.</div></div></main>
       </div>
     );
   }

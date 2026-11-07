@@ -37,7 +37,7 @@ export default function PacketPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="frame">
-      <style>{PACKET_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: PACKET_CSS }} />
       <main style={{ padding: "0 12px 48px" }}>
         <div className="no-print" style={{ maxWidth: 820, margin: "0 auto", padding: "16px 0 18px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <Link href={`/portal/quote/${params.id}`} className="btn-ghost btn-sm">← Back to quote</Link>

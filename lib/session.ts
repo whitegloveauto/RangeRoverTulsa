@@ -82,7 +82,17 @@ export async function getSession(): Promise<SessionClaims | null> {
   const token = cookies().get(DEALER_COOKIE)?.value;
   if (!token) return null;
   const s = await verifySession(token);
-  return s && s.kind === "dealer" ? s : null;
+  if (!s || s.kind !== "dealer") return null;
+  // Deactivating a dealership or a login must take effect now, not when the 30-day cookie expires.
+  if (!s.viewAs) {
+    const { data: d } = await supabaseAdmin.from("dealer_dealerships").select("active").eq("id", s.dealershipId).maybeSingle();
+    if (!d?.active) return null;
+    if (s.userId) {
+      const { data: u } = await supabaseAdmin.from("dealer_users").select("active").eq("id", s.userId).maybeSingle();
+      if (u && !u.active) return null;
+    }
+  }
+  return s;
 }
 
 // White Glove Auto session (admin or team). Permissions are read live so a change on /wga/team

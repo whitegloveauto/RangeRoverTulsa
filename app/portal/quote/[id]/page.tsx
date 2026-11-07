@@ -1,11 +1,12 @@
 "use client";
 
 import OrderActivity from "@/components/OrderActivity";
+import OrderTimeline from "@/components/OrderTimeline";
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 function fmt(n: number) {
   return "$" + Number(n).toLocaleString("en-US");
@@ -32,11 +33,15 @@ interface QuoteData {
   created_at: string;
 }
 
-export default function QuoteSheetPage() {
+function QuoteSheetInner() {
   const params = useParams();
   const router = useRouter();
+  const sp = useSearchParams();
+  const justSent = sp.get("sent") === "1";
   const [quote, setQuote] = useState<QuoteData | null>(null);
+  const [events, setEvents] = useState<any[]>([]);
   const [dealership, setDealership] = useState<{ name: string } | null>(null);
+  const [brand, setBrand] = useState<{ name: string; logo_url: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -50,7 +55,9 @@ export default function QuoteSheetPage() {
       }
       const data = await res.json();
       setQuote(data.quote);
+      setEvents(data.events || []);
       setDealership(data.dealership);
+      setBrand(data.brand || null);
       setLoading(false);
     })();
   }, [params.id]);
@@ -115,11 +122,13 @@ export default function QuoteSheetPage() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "18px 32px",
+            padding: "14px 20px",
+            gap: 10,
+            flexWrap: "wrap",
             borderBottom: "1px solid var(--stroke-soft)",
           }}
         >
-          <button className="reset" onClick={() => router.back()}>
+          <button className="reset" onClick={() => router.push("/portal/orders")}>
             ← BACK
           </button>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -132,6 +141,11 @@ export default function QuoteSheetPage() {
           </div>
         </div>
 
+        {justSent ? (
+          <div className="no-print" style={{ padding: "16px 20px 0", maxWidth: 820, margin: "0 auto" }}>
+            <div className="notice ok" style={{ marginBottom: 0 }}>Order <b>{quote.quote_number}</b> is on its way to White Glove Auto{quote.sm_order_number ? <> — ticket <b>RO {quote.sm_order_number}</b> is already open</> : null}. Photos and status updates will show up at the bottom of this page.</div>
+          </div>
+        ) : null}
         <main style={{ display: "flex", justifyContent: "center", padding: "40px 20px" }}>
           <div
             className="sheet"
@@ -156,12 +170,21 @@ export default function QuoteSheetPage() {
               }}
             >
               <div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/wga-black.png"
-                  alt="White Glove Auto"
-                  style={{ height: 32, width: "auto", display: "block", marginBottom: 6 }}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6 }}>
+                  {brand?.logo_url ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={brand.logo_url} alt={brand.name} style={{ height: 38, width: "auto", maxWidth: 120, objectFit: "contain", display: "block" }} />
+                      <div style={{ width: 1, height: 30, background: "#DDD9CF" }} />
+                    </>
+                  ) : null}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/wga-black.png"
+                    alt="White Glove Auto"
+                    style={{ height: 26, width: "auto", display: "block" }}
+                  />
+                </div>
                 <div
                   style={{
                     fontSize: 10,
@@ -192,7 +215,7 @@ export default function QuoteSheetPage() {
                     marginTop: 2,
                   }}
                 >
-                  {dealership?.name || quote.vehicle_model}
+                  {quote.customer_name || dealership?.name || "—"}
                 </div>
               </div>
             </div>
@@ -420,11 +443,21 @@ export default function QuoteSheetPage() {
         </main>
         {quote.status !== "draft" ? (
           <section className="no-print" style={{ maxWidth: 780, margin: "0 auto", padding: "0 20px 48px" }}>
-            <div className="stage-eyebrow" style={{ marginBottom: 10 }}>AFTER SUBMITTING</div>
+            <div className="stage-eyebrow" style={{ marginBottom: 10 }}>ORDER STATUS</div>
+            <OrderTimeline quote={quote} events={events} />
+            <div className="stage-eyebrow" style={{ margin: "22px 0 10px" }}>AFTER SUBMITTING</div>
             <OrderActivity quoteId={String(params.id)} side="dealer" />
           </section>
         ) : null}
       </div>
     </>
+  );
+}
+
+export default function QuoteSheetPage() {
+  return (
+    <Suspense fallback={null}>
+      <QuoteSheetInner />
+    </Suspense>
   );
 }

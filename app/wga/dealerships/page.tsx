@@ -88,10 +88,10 @@ export default function WgaDealershipsPage() {
           {dealerships.map((d) => {
             const du = users.filter((u) => u.dealership_id === d.id);
             return (
-              <div key={d.id} className="card">
+              <div key={d.id} className="card" style={{ opacity: d.active ? 1 : 0.6, borderColor: d.active ? undefined : "var(--warn)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
                   <div>
-                    <h3 style={{ marginBottom: 2 }}>{d.name}</h3>
+                    <h3 style={{ marginBottom: 2 }}>{d.name}{d.active ? null : <span className="status-pill cancelled" style={{ marginLeft: 10, verticalAlign: "middle" }}>Inactive — logins blocked</span>}</h3>
                     <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{d.location} · {d.brand} · slug <b style={{ color: "var(--text-2)" }}>{d.slug}</b> · net {d.billing_terms}</div>
                     <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>Portal: {(d.hostnames || []).length ? (d.hostnames || []).map((h) => <a key={h} href={`https://${h}`} target="_blank" rel="noreferrer" style={{ color: "var(--gold)", marginRight: 10 }}>{h}</a>) : <span>no hostname yet</span>}
                       <button className="link-btn" onClick={() => { const v = prompt("Hostnames for this dealership (comma separated):", (d.hostnames || []).join(", ")); if (v !== null) act({ action: "dealership.update", id: d.id, hostnames: v }).catch((er) => setMsg(er.message)); }}>edit</button>
@@ -105,7 +105,7 @@ export default function WgaDealershipsPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 24, flexWrap: "wrap", margin: "16px 0" }}>
-                  <label className="check"><input type="checkbox" checked={d.active} onChange={(e) => act({ action: "dealership.update", id: d.id, active: e.target.checked }).catch((er) => setMsg(er.message))} /> Active</label>
+                  <label className="check"><input type="checkbox" checked={d.active} onChange={(e) => { if (!e.target.checked && !confirm(`Deactivate ${d.name}? Every one of their logins stops working immediately and their portal link goes dark until you turn it back on.`)) { e.preventDefault(); return; } act({ action: "dealership.update", id: d.id, active: e.target.checked }).catch((er) => setMsg(er.message)); }} /> Active</label>
                   <label className="check"><input type="checkbox" checked={d.hide_cost_from_users} onChange={(e) => act({ action: "dealership.update", id: d.id, hide_cost_from_users: e.target.checked }).catch((er) => setMsg(er.message))} /> Hide WGA cost from their sales users</label>
                 </div>
                 {/* Phones: one card per login */}
