@@ -67,14 +67,16 @@ export default function WgaHeader({ userName, role, perms = [] }: { userName: st
             </select>
           </label>
         ) : null}
-        <span className="pill role">{userName.toUpperCase()}</span>
-        <span className="pill">{role === "admin" ? "ADMIN" : "TEAM"}</span>
         {hasPerm(me, "view_as") ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
-        <Link href="/wga/pin" className="signout" title="Change PIN">PIN</Link>
-        <Link href="/wga/password" className="signout" title="Change password">Password</Link>
-        <button className="signout" onClick={signOut}>
-          Sign Out
-        </button>
+        <div className="acct" tabIndex={0}>
+          <span className="pill role">{userName.split(" ")[0].toUpperCase()} · {role === "admin" ? "ADMIN" : "TEAM"} ▾</span>
+          <div className="acct-menu">
+            <div className="acct-name">{userName}</div>
+            <Link href="/wga/pin">Change PIN</Link>
+            <Link href="/wga/password">Change password</Link>
+            <button onClick={signOut}>Sign out</button>
+          </div>
+        </div>
       </div>
       <SideMenu
         title="White Glove Auto"

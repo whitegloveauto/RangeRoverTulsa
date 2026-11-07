@@ -616,3 +616,12 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
   .modal div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   .modal .field[style*="grid-column"] { grid-column: auto !important; }
 }
+
+/* WGA header account menu */
+.acct { position: relative; }
+.acct .pill.role { cursor: pointer; }
+.acct-menu { display: none; position: absolute; right: 0; top: calc(100% + 8px); min-width: 200px; background: var(--surface); border: 1px solid var(--stroke); padding: 8px; z-index: 50; box-shadow: 0 12px 30px rgba(0,0,0,0.4); }
+.acct:hover .acct-menu, .acct:focus-within .acct-menu { display: grid; gap: 2px; }
+.acct-menu .acct-name { font-size: 11px; color: var(--text-3); padding: 6px 10px 8px; border-bottom: 1px solid var(--stroke-soft); margin-bottom: 4px; }
+.acct-menu a, .acct-menu button { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); font: inherit; font-size: 13px; padding: 8px 10px; cursor: pointer; text-decoration: none; }
+.acct-menu a:hover, .acct-menu button:hover { background: var(--surface-2); }
