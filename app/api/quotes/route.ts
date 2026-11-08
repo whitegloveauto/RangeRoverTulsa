@@ -50,6 +50,43 @@ export async function POST(req: Request) {
   if (!vehicleYear || !vehicleModel || !vehicleTrim) {
     return NextResponse.json({ error: "Vehicle year, model, and trim are required." }, { status: 400 });
   }
+  const vinNorm = typeof vehicleVin === "string" ? vehicleVin.replace(/\s+/g, "").toUpperCase() : "";
+  const stockNorm = typeof stockNumber === "string" ? stockNumber.trim() : "";
+
+  // Same car ordered twice? Check this dealership's live orders from the last 30 days by VIN or stock #.
+  if (submit && !body.confirmDuplicate && (vinNorm.length >= 11 || stockNorm)) {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const ors = [vinNorm.length >= 11 ? `vehicle_vin.ilike.${vinNorm.replace(/[%_,()]/g, "")}` : "", stockNorm ? `stock_number.ilike.${stockNorm.replace(/[%_,()]/g, "")}` : ""].filter(Boolean).join(",");
+    const { data: dups } = await supabaseAdmin
+      .from("dealer_quotes")
+      .select("id, quote_number, status, submitted_at, vehicle_vin, stock_number, dealer_user_name, line_items, sm_order_number")
+      .eq("dealership_id", session.dealershipId)
+      .not("status", "in", "(draft,cancelled)")
+      .gte("submitted_at", since)
+      .or(ors)
+      .order("submitted_at", { ascending: false })
+      .limit(3);
+    if (dups && dups.length) {
+      const d = dups[0];
+      return NextResponse.json(
+        {
+          error: "duplicate",
+          duplicate: {
+            id: d.id,
+            quote_number: d.quote_number,
+            status: d.status,
+            submitted_at: d.submitted_at,
+            by: d.dealer_user_name,
+            ro: d.sm_order_number,
+            match: vinNorm.length >= 11 && (d.vehicle_vin || "").toUpperCase() === vinNorm ? "VIN" : "stock #",
+            services: (Array.isArray(d.line_items) ? d.line_items : []).map((l: any) => l.name).join(", "),
+          },
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const ids: string[] = Array.isArray(itemIds) ? itemIds.filter((x) => typeof x === "string") : [];
   if (!ids.length) return NextResponse.json({ error: "Select at least one service." }, { status: 400 });
 
@@ -83,8 +120,8 @@ export async function POST(req: Request) {
       vehicle_year: Number(vehicleYear),
       vehicle_model: vehicleModel,
       vehicle_trim: vehicleTrim,
-      vehicle_vin: vehicleVin || null,
-      stock_number: stockNumber || null,
+      vehicle_vin: vinNorm || null,
+      stock_number: stockNorm || null,
       customer_name: customerName || null,
       customer_phone: customerPhone || null,
       customer_email: customerEmail || null,

@@ -17,6 +17,22 @@ export default function WgaLoginPage() {
   const [mode, setMode] = useState<"loading" | "pin" | "password">("loading");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState<null | { busy?: boolean; sent?: boolean; noEmail?: boolean; err?: string }>(null);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reset") === "1") setNotice("Password updated — sign in with your new one. It's the same password for the White Glove app.");
+  }, []);
+
+  async function sendReset() {
+    const addr = email.trim();
+    if (!addr) return setForgot({ err: "Type your email above first." });
+    setForgot({ busy: true });
+    const r = await fetch("/api/wga/auth/forgot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setForgot({ err: d.error || "Could not send." });
+    setForgot(d.emailConfigured === false ? { noEmail: true } : { sent: true });
+  }
 
   useEffect(() => {
     (async () => {
@@ -105,6 +121,7 @@ export default function WgaLoginPage() {
 
           {mode === "password" ? (
             <>
+              {notice ? <div className="notice" style={{ maxWidth: 420, margin: "0 auto 18px" }}>{notice}</div> : null}
               <h1 className="login-title">Admin.</h1>
               <p className="login-sub">Same email and password as the White Glove portal. After you sign in, this browser will let you use your PIN next time.</p>
               <form className="login-form" onSubmit={submitPassword}>
@@ -112,7 +129,25 @@ export default function WgaLoginPage() {
                 <div className="field"><label htmlFor="wp">Password</label><input id="wp" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /><div className="login-err">{error}</div></div>
                 <button className="btn-primary" type="submit" disabled={busy}>{busy ? "Signing In…" : "Sign In"}</button>
               </form>
-              {device?.hasPin ? <p style={{ marginTop: 18, fontSize: 12 }}><button className="link-btn" onClick={() => { setMode("pin"); setError(""); }}>Use PIN instead</button></p> : null}
+              <p style={{ marginTop: 18, fontSize: 12 }}>
+                {device?.hasPin ? <><button className="link-btn" onClick={() => { setMode("pin"); setError(""); }}>Use PIN instead</button>{" · "}</> : null}
+                <button className="link-btn" onClick={() => setForgot(forgot ? null : {})}>Forgot your password?</button>
+              </p>
+              {forgot ? (
+                <div className="notice" style={{ textAlign: "left", maxWidth: 420, margin: "10px auto 0" }}>
+                  {forgot.sent ? (
+                    <>If <b>{email.trim()}</b> is a White Glove account, a reset link is on its way (one use, one hour).</>
+                  ) : forgot.noEmail ? (
+                    <>Email reset isn&apos;t switched on yet — Myron can reset it from the White Glove portal.</>
+                  ) : (
+                    <>
+                      Enter your email above and we&apos;ll email you a link to set a new password.
+                      <div style={{ marginTop: 10 }}><button type="button" className="btn-primary btn-sm" disabled={forgot.busy} onClick={sendReset}>{forgot.busy ? "Sending…" : "Email me a reset link"}</button></div>
+                      {forgot.err ? <div className="login-err" style={{ marginTop: 8 }}>{forgot.err}</div> : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
             </>
           ) : null}
         </div>

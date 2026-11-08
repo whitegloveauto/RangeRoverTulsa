@@ -15,6 +15,25 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [tenant, setTenant] = useState<any>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [forgot, setForgot] = useState<{ busy?: boolean; sent?: boolean; noEmail?: boolean; err?: string }>({});
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reset") === "1") setNotice("Password updated — sign in with your new one.");
+  }, []);
+
+  async function sendReset() {
+    const addr = email.trim();
+    if (!addr) {
+      setForgot({ err: "Type your email above first." });
+      return;
+    }
+    setForgot({ busy: true });
+    const r = await fetch("/api/auth/forgot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setForgot({ err: d.error || "Could not send." });
+    setForgot(d.emailConfigured === false ? { noEmail: true } : { sent: true });
+  }
 
   useEffect(() => {
     fetch("/api/tenant").then((r) => (r.ok ? r.json() : null)).then(setTenant).catch(() => {});
@@ -76,6 +95,7 @@ export default function LoginPage() {
             Vehicle-specific pricing for paint protection film, ceramic coating, window tint, and windshield protection — installed by White Glove Auto.
           </p>
 
+          {notice ? <div className="notice" style={{ maxWidth: 420, margin: "0 auto 18px" }}>{notice}</div> : null}
           <form className="login-form" onSubmit={handleLogin}>
             <div className="field">
               <label htmlFor="dealer-email">Email</label>
@@ -95,11 +115,23 @@ export default function LoginPage() {
             AUTHORIZED FOR &nbsp; <span>{(tenant?.dealership?.name || "").toUpperCase()}</span>
           </div>
           <p style={{ marginTop: 18, fontSize: 12 }}>
-            <button type="button" className="link-btn" onClick={() => setShowHelp((v) => !v)}>Forgot your password?</button>
+            <button type="button" className="link-btn" onClick={() => { setShowHelp((v) => !v); setForgot({}); }}>Forgot your password?</button>
           </p>
           {showHelp ? (
             <div className="notice" style={{ textAlign: "left", maxWidth: 420, margin: "10px auto 0" }}>
-              Your dealership admin can reset it from <b>Settings → Team logins</b> in about ten seconds. If you&apos;re the admin, White Glove Auto can reset yours — call or text the shop.
+              {forgot.sent ? (
+                <>If <b>{email.trim()}</b> has a login here, a reset link is on its way. It works once and expires in an hour — check spam if you don&apos;t see it in a minute.</>
+              ) : forgot.noEmail ? (
+                <>Email reset isn&apos;t switched on yet. Your dealership admin can reset it from <b>Settings → Team logins</b>; if you&apos;re the admin, call or text White Glove Auto.</>
+              ) : (
+                <>
+                  Enter your email above and we&apos;ll send you a link to choose a new one.
+                  <div style={{ marginTop: 10 }}>
+                    <button type="button" className="btn-primary btn-sm" disabled={forgot.busy} onClick={sendReset}>{forgot.busy ? "Sending…" : "Email me a reset link"}</button>
+                  </div>
+                  {forgot.err ? <div className="login-err" style={{ marginTop: 8 }}>{forgot.err}</div> : null}
+                </>
+              )}
             </div>
           ) : null}
           <p style={{ marginTop: 22, fontSize: 11, letterSpacing: "0.12em" }}>

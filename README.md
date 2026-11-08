@@ -80,6 +80,18 @@ git push -u origin main
 Netlify → Site settings → Environment variables. Add the same three:
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`.
 
+Email (dealer update emails + password-reset links) — optional; without these,
+emails are skipped and logged, and "Forgot password" falls back to "ask your admin":
+
+- `RESEND_API_KEY` — from resend.com (verify the sending domain there first)
+- `EMAIL_FROM` — e.g. `White Glove Auto <orders@whitegloveauto.app>`
+- `EMAIL_REPLY_TO` — optional, where dealer replies go (e.g. the shop inbox)
+
+ShopMonkey status sync runs from `netlify/functions/sm-sync.mjs` every 10 minutes
+(Netlify scheduled function). It calls `/api/internal/sm-sync` with a key derived
+from `SESSION_SECRET`, which reads each open RO through the `dealer-order-sm`
+edge function and moves portal status forward (scheduled → in progress → complete).
+
 ### D · Custom domain
 
 Netlify → Domain management → Add custom domain → `dealers.whitegloveauto.app`.
@@ -129,11 +141,17 @@ WHERE brand = 'Range Rover' AND tier = 'ESSENTIAL';
 - **Vehicle selection** persists in `sessionStorage` across the vehicle →
   pricing navigation.
 
-## What's next (not yet built)
+## Notifications, resets, statements
 
-- Quote PDF generation (currently quotes save to `dealer_quotes`; PDF render is
-  a follow-up)
-- Admin screen to view saved quotes (data is there; UI pending)
-- Live WebConnect proxy for real-time à la carte pricing (currently the à la
-  carte catalog is seeded static pricing in `dealer_alacarte_catalog`)
-- Multi-brand support via subdomain → slug resolution
+- **Update emails** (`lib/dealerEmail.ts`): order scheduled / in progress / complete /
+  cancelled, new install date, QC photos, WGA replies, comeback updates. Per-user level
+  (their orders / every order / off) and extra addresses live in
+  `dealer_program_settings` under `notify:<dealership id>`; dealer admins set them in
+  Settings.
+- **Password reset** (`lib/reset.ts`): signed 1-hour links carrying a fingerprint of the
+  current password state, so each link works once — no token table.
+- **Statements** (`lib/statements.ts`): orders completed in a month (Tulsa time) at WGA
+  cost with the dealership's `billing_terms`; CSV + print. WGA: /wga/statements.
+  Dealer admins: Settings → Statements.
+- **Duplicate guard**: submitting an order for a VIN or stock # that already has a live
+  order from the last 30 days asks for confirmation first.

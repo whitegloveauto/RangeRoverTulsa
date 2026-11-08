@@ -25,28 +25,6 @@ export default function WgaVehiclesPage() {
   const [newYear, setNewYear] = useState("");
   const [addTrim, setAddTrim] = useState<{ model: string; trim: string } | null>(null);
   const [newModel, setNewModel] = useState({ model: "", trim: "" });
-  const [images, setImages] = useState<Record<string, string>>({});
-
-  async function loadImages() {
-    const r = await fetch("/api/wga/vehicles/image");
-    if (r.ok) setImages((await r.json()).images || {});
-  }
-  async function uploadImage(model: string, file: File) {
-    setMsg("");
-    setBusy(true);
-    const fd = new FormData();
-    fd.append("model", model);
-    fd.append("file", file);
-    const r = await fetch("/api/wga/vehicles/image", { method: "POST", body: fd });
-    const d = await r.json();
-    setBusy(false);
-    if (!r.ok) return setMsg(d.error || "Upload failed");
-    await loadImages();
-  }
-  async function removeImage(model: string) {
-    await fetch("/api/wga/vehicles/image", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
-    await loadImages();
-  }
 
   async function load() {
     const r = await fetch("/api/wga/vehicles");
@@ -58,10 +36,7 @@ export default function WgaVehiclesPage() {
     }
   }
   useEffect(() => {
-    if (ready) {
-      load();
-      loadImages();
-    }
+    if (ready) load();
   }, [ready]);
 
   async function act(body: any) {
@@ -104,7 +79,7 @@ export default function WgaVehiclesPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">VEHICLE CATALOG</div>
             <div className="stage-title">Years, models, trims.</div>
-            <div className="stage-sub">What dealers can pick when they build an order. Pricing is per model, so a new trim needs no pricing — it just makes sure the right pattern gets cut. When a new model year drops, copy the previous year and adjust. Each model can carry a photo for the customer packet (a side profile on a plain background works best); without one the packet uses a line diagram.</div>
+            <div className="stage-sub">What dealers can pick when they build an order. Pricing is per model, so a new trim needs no pricing — it just makes sure the right pattern gets cut. When a new model year drops, copy the previous year and adjust.</div>
           </div>
           {msg ? <div className="notice warn">{msg}</div> : null}
 
@@ -156,19 +131,6 @@ export default function WgaVehiclesPage() {
                     <button className="btn-ghost btn-sm" disabled={busy} onClick={() => act({ action: "model.setActive", model, year, active: !anyActive })}>{anyActive ? `Hide for ${year}` : `Show for ${year}`}</button>
                     <button className="btn-primary btn-sm" disabled={busy} onClick={() => setAddTrim({ model, trim: "" })}>+ Trim</button>
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
-                  {images[model] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={images[model]} alt={model} style={{ height: 64, width: "auto", maxWidth: 160, objectFit: "contain", background: "#fff", padding: 4, border: "1px solid var(--stroke)" }} />
-                  ) : (
-                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>No packet photo — diagram will be used</span>
-                  )}
-                  <label className="btn-ghost btn-sm" style={{ cursor: "pointer" }}>
-                    {images[model] ? "Replace photo" : "Add packet photo"}
-                    <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && uploadImage(model, e.target.files[0])} />
-                  </label>
-                  {images[model] ? <button className="link-btn danger" onClick={() => removeImage(model)}>Remove</button> : null}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
                   {trims.map((t) => (

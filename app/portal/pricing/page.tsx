@@ -25,6 +25,7 @@ export default function PricingPage() {
   const [neededBy, setNeededBy] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean }>({ text: "" });
+  const [dup, setDup] = useState<any>(null);
 
   useEffect(() => {
     const v = getSelectedVehicle();
@@ -66,10 +67,11 @@ export default function PricingPage() {
     });
   }
 
-  async function save(submit: boolean) {
+  async function save(submit: boolean, confirmDuplicate = false) {
     if (!vehicle || !selected.size) return;
     setBusy(true);
     setMsg({ text: "" });
+    setDup(null);
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -86,10 +88,15 @@ export default function PricingPage() {
         notes,
         itemIds: Array.from(selected),
         submit,
+        confirmDuplicate,
       }),
     });
     const data = await res.json();
     setBusy(false);
+    if (res.status === 409 && data.duplicate) {
+      setDup(data.duplicate);
+      return;
+    }
     if (!res.ok) {
       setMsg({ text: data.error || "Could not save.", err: true });
       return;
@@ -209,6 +216,17 @@ export default function PricingPage() {
               <button className="btn-ghost" disabled={busy || !totals.count} onClick={() => save(false)}>Save quote</button>
               <button className="btn-primary" disabled={busy || !totals.count} onClick={() => save(true)}>{busy ? "Sending…" : "Submit order"}</button>
             </div>
+            {dup ? (
+              <div className="dup-warn" role="alert">
+                <b>This car was already ordered.</b> Same {dup.match} as order <b>{dup.quote_number}</b>{dup.ro ? ` (RO ${dup.ro})` : ""}, submitted {new Date(dup.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{dup.by ? ` by ${dup.by}` : ""} — {dup.services || "services on file"}. Status: {String(dup.status).replace("_", " ")}.
+                <div style={{ marginTop: 6 }}>If you&apos;re adding services to that car, submit anyway and say so in the notes. If it&apos;s a mistake, open the existing order instead.</div>
+                <div className="dup-actions">
+                  <Link href={`/portal/quote/${dup.id}`} className="btn-ghost btn-sm" style={{ display: "inline-block" }}>Open {dup.quote_number}</Link>
+                  <button className="btn-primary btn-sm" disabled={busy} onClick={() => save(true, true)}>Submit anyway</button>
+                  <button className="link-btn" onClick={() => setDup(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : null}
             <div className="db-note" style={{ color: msg.err ? "var(--warn)" : undefined }}>
               {msg.text || (
                 <>

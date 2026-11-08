@@ -34,6 +34,7 @@ export default function WgaHeader({ userName, role, perms = [] }: { userName: st
 
   const links = [
     ...(hasPerm(me, "orders") ? [{ href: "/wga/orders", label: "Orders" }] : []),
+    ...(hasPerm(me, "orders") ? [{ href: "/wga/statements", label: "Statements" }] : []),
     ...(hasPerm(me, "comebacks") ? [{ href: "/wga/comebacks", label: "Comebacks" }] : []),
     ...(hasPerm(me, "pricing") ? [{ href: "/wga/pricing", label: "Pricing" }] : []),
     ...(hasPerm(me, "vehicles") ? [{ href: "/wga/vehicles", label: "Vehicles" }] : []),
@@ -67,7 +68,7 @@ export default function WgaHeader({ userName, role, perms = [] }: { userName: st
             </select>
           </label>
         ) : null}
-        {hasPerm(me, "view_as") ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealership ↗</button> : null}
+        {hasPerm(me, "view_as") ? <button className="signout" style={{ color: "var(--gold)" }} onClick={viewAsDealer} title="Open the dealer portal as the dealership sees it">View as dealer ↗</button> : null}
         <div className="acct" tabIndex={0}>
           <span className="pill role">{userName.split(" ")[0].toUpperCase()} · {role === "admin" ? "ADMIN" : "TEAM"} ▾</span>
           <div className="acct-menu">

@@ -36,6 +36,15 @@ export default function WgaOrdersPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [sync, setSync] = useState<null | { busy?: boolean; res?: any; open?: boolean }>(null);
+
+  async function syncNow() {
+    setSync({ busy: true });
+    const r = await fetch("/api/wga/sm-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const res = await r.json().catch(() => ({ ok: false, error: "No response" }));
+    setSync({ res, open: true });
+    if (res.ok) await load();
+  }
 
   async function load(f = filter) {
     // "open" = everything not finished; the API filters single statuses, so fetch all and trim here
@@ -74,6 +83,33 @@ export default function WgaOrdersPage() {
             ))}
           </div>
           {msg ? <div className="notice warn">{msg}</div> : null}
+          <div className="sm-sync-bar">
+            <span>Statuses follow the ShopMonkey workflow automatically every 10 minutes (forward only — scheduled, in progress, complete). The dealership is emailed when an order moves.</span>
+            <button className="btn-ghost btn-sm" disabled={!!sync?.busy} onClick={syncNow}>{sync?.busy ? "Checking ShopMonkey…" : "Sync ShopMonkey now"}</button>
+          </div>
+          {sync?.res && sync.open ? (
+            <div className={"notice" + (sync.res.ok ? "" : " warn")} style={{ position: "relative" }}>
+              <button className="link-btn" style={{ position: "absolute", right: 12, top: 10 }} onClick={() => setSync({ ...sync, open: false })}>close</button>
+              {sync.res.ok ? (
+                <>
+                  <b>Checked {sync.res.checked} open RO{sync.res.checked === 1 ? "" : "s"} · {sync.res.changed} moved.</b>
+                  {sync.res.workflowStatuses?.length ? <div style={{ fontSize: 11, marginTop: 6, color: "var(--text-3)" }}>Your ShopMonkey workflow: {sync.res.workflowStatuses.join(" → ")}</div> : null}
+                  {sync.res.lines?.length ? (
+                    <div className="tbl-wrap" style={{ marginTop: 10 }}>
+                      <table className="tbl compact">
+                        <thead><tr><th>Order</th><th>RO</th><th>ShopMonkey</th><th>Portal</th><th>Why</th></tr></thead>
+                        <tbody>
+                          {sync.res.lines.map((l: any) => (
+                            <tr key={l.quote_number}><td>{l.quote_number}</td><td>{l.ro || "—"}</td><td>{l.workflow || l.sm_status || "—"}</td><td>{(() => { const lab = (k: string) => (STATUSES.find((x) => x[0] === k) || [k, k])[1]; return l.to ? <b>{lab(l.from)} → {lab(l.to)}</b> : lab(l.from); })()}</td><td style={{ fontSize: 11 }}>{l.note}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : <div style={{ marginTop: 6 }}>No open orders with a ShopMonkey RO.</div>}
+                </>
+              ) : <>ShopMonkey sync failed: {sync.res.error || "unknown error"}</>}
+            </div>
+          ) : null}
 
           {/* Phones: one card per order, tap to expand actions */}
           {isPhone ? <div className="order-cards">
@@ -154,7 +190,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
                 </select>
               </div>
               <div className="field"><label>Assigned to</label><input defaultValue={o.assigned_name || ""} placeholder="Tech / advisor" onBlur={(e) => e.target.value !== (o.assigned_name || "") && onPatch({ assigned_name: e.target.value })} /></div>
-              <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onChange={(e) => onPatch({ scheduled_date: e.target.value })} /></div>
+              <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onBlur={(e) => e.target.value !== (o.scheduled_date || "") && onPatch({ scheduled_date: e.target.value })} /></div>
               <div className="field"><label>Internal notes</label><input defaultValue={o.internal_notes || ""} placeholder="RO #, parts, etc." onBlur={(e) => e.target.value !== (o.internal_notes || "") && onPatch({ internal_notes: e.target.value })} /></div>
             </div>
             <div style={{ marginTop: 16 }} onClick={(e) => e.stopPropagation()}><OrderActivity quoteId={o.id} side="wga" /></div>
@@ -221,7 +257,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
               </select>
             </div>
             <div className="field"><label>Assigned to</label><input defaultValue={o.assigned_name || ""} placeholder="Tech / advisor" onBlur={(e) => e.target.value !== (o.assigned_name || "") && onPatch({ assigned_name: e.target.value })} /></div>
-            <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onChange={(e) => onPatch({ scheduled_date: e.target.value })} /></div>
+            <div className="field"><label>Scheduled date</label><input type="date" defaultValue={o.scheduled_date || ""} onBlur={(e) => e.target.value !== (o.scheduled_date || "") && onPatch({ scheduled_date: e.target.value })} /></div>
             <div className="field"><label>Internal notes</label><input defaultValue={o.internal_notes || ""} placeholder="Parts, notes…" onBlur={(e) => e.target.value !== (o.internal_notes || "") && onPatch({ internal_notes: e.target.value })} /></div>
           </div>
           <div style={{ marginTop: 16 }}><OrderActivity quoteId={o.id} side="wga" /></div>

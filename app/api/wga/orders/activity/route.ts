@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm } from "@/lib/session";
 import { loadActivity, uploadOrderPhoto, deleteOrderPhoto } from "@/lib/orderActivity";
+import { emailOrderEvent } from "@/lib/dealerEmail";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
       if (!quoteId || !files.length) return NextResponse.json({ error: "No photos." }, { status: 400 });
       for (const f of files) await uploadOrderPhoto(quoteId, f, "qc", s.userName, String(form.get("caption") || ""));
       await supabaseAdmin.from("dealer_order_events").insert({ quote_id: quoteId, event_type: "qc_photos", actor_name: s.userName, detail: `${files.length} QC photo(s) added` });
+      await emailOrderEvent(quoteId, { kind: "qc", count: files.length });
       return NextResponse.json({ ok: true, added: files.length });
     }
     const b = await req.json();
@@ -35,6 +37,7 @@ export async function POST(req: Request) {
       const body = String(b.body || "").trim();
       if (!b.quote_id || !body) return NextResponse.json({ error: "Missing reply." }, { status: 400 });
       await supabaseAdmin.from("dealer_order_messages").insert({ quote_id: b.quote_id, kind: "reply", body, author_kind: "wga", author_name: s.userName, status: "done" });
+      await emailOrderEvent(b.quote_id, { kind: "reply", body, author: s.userName });
       return NextResponse.json({ ok: true });
     }
     if (b.action === "resolve") {

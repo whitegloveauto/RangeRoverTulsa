@@ -59,9 +59,9 @@ export default function WgaComebacksPage() {
                 </div>
                 <div className="oc-actions" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
                   <div className="field"><label>Status</label><select value={c.status} onChange={(e) => patch(c.id, { status: e.target.value })}>{STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
-                  <div className="field"><label>Scheduled date</label><input type="date" defaultValue={c.scheduled_date || ""} onChange={(e) => patch(c.id, { scheduled_date: e.target.value })} /></div>
+                  <div className="field"><label>Scheduled date</label><input type="date" defaultValue={c.scheduled_date || ""} onBlur={(e) => e.target.value !== (c.scheduled_date || "") && patch(c.id, { scheduled_date: e.target.value })} /></div>
                   <div className="field"><label>Comeback RO #</label><input defaultValue={c.sm_order_number || ""} placeholder="ShopMonkey RO" onBlur={(e) => e.target.value !== (c.sm_order_number || "") && patch(c.id, { sm_order_number: e.target.value })} /></div>
-                  <div className="field" style={{ gridColumn: "1 / -1" }}><label>Notes to the dealership (they see this)</label><input defaultValue={c.wga_notes || ""} placeholder="What we found, what we did, when it's done…" onBlur={(e) => e.target.value !== (c.wga_notes || "") && patch(c.id, { wga_notes: e.target.value })} /></div>
+                  <div className="field" style={{ gridColumn: "1 / -1" }}><label>Notes to the dealership (they see this)</label><input defaultValue={c.wga_notes || ""} placeholder="What we found, what we did, when it's done…" onBlur={(e) => e.target.value !== (c.wga_notes || "") && patch(c.id, { wga_notes: e.target.value, notify_note: true })} /></div>
                 </div>
                 {c.quote_id ? <div style={{ marginTop: 10 }}><a className="link-btn" href={`/wga/orders?open=${c.quote_id}`}>Open original order →</a></div> : null}
               </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm } from "@/lib/session";
 import { createShopMonkeyTicket } from "@/lib/shopmonkey";
+import { emailOrderEvent } from "@/lib/dealerEmail";
 
 export const runtime = "nodejs";
 
@@ -48,7 +49,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true, sm_order_number: r.number });
   }
 
-  const { data: cur } = await supabaseAdmin.from("dealer_quotes").select("status").eq("id", b.id).single();
+  const { data: cur } = await supabaseAdmin.from("dealer_quotes").select("status, scheduled_date").eq("id", b.id).single();
   const patch: any = {};
   if (b.status !== undefined) {
     if (!(ORDER_STATUSES as readonly string[]).includes(b.status)) return NextResponse.json({ error: "Bad status." }, { status: 400 });
@@ -57,6 +58,12 @@ export async function PATCH(req: Request) {
   }
   if (b.assigned_name !== undefined) patch.assigned_name = b.assigned_name || null;
   if (b.scheduled_date !== undefined) patch.scheduled_date = b.scheduled_date || null;
+  // Putting a date on an order that hasn't been scheduled yet schedules it (one email, with the date).
+  if (b.status === undefined && b.scheduled_date && cur && ["new", "in_shopmonkey"].includes(cur.status)) {
+    b.status = "scheduled";
+    patch.status = "scheduled";
+    patch.status_updated_at = new Date().toISOString();
+  }
   if (b.internal_notes !== undefined) patch.internal_notes = b.internal_notes || null;
   patch.updated_at = new Date().toISOString();
 
@@ -72,6 +79,13 @@ export async function PATCH(req: Request) {
       actor_name: s.userName,
       detail: `Status set to ${b.status} by ${s.userName}`,
     });
+  }
+  // Tell the dealership (status moves they care about, or a new install date on a scheduled order).
+  const statusChanged = b.status !== undefined && cur && cur.status !== b.status;
+  if (statusChanged && ["scheduled", "in_progress", "complete", "cancelled"].includes(b.status)) {
+    await emailOrderEvent(b.id, { kind: "status", status: b.status });
+  } else if (!statusChanged && b.scheduled_date !== undefined && b.scheduled_date && cur && cur.scheduled_date !== b.scheduled_date && cur.status === "scheduled") {
+    await emailOrderEvent(b.id, { kind: "schedule" });
   }
   return NextResponse.json({ ok: true });
 }
