@@ -89,8 +89,9 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
                     <b>{money(l.amount)}</b>
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6, lineHeight: 1.5 }}>
-                    {nice(l.completed)} · {l.quote_number}{l.ro ? ` · RO ${l.ro}` : ""}{l.stock ? ` · Stock ${l.stock}` : ""}<br />
-                    {l.services}{l.customer ? ` · ${l.customer}` : ""}
+                    {nice(l.completed)} · {l.quote_number}{l.ro ? ` · RO ${l.ro}` : ""}<br />
+                    {l.vin ? <><span className="vin">VIN {l.vin}</span><br /></> : null}
+                    {l.services}
                   </div>
                 </div>
               ))}
@@ -99,7 +100,7 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead>
-                  <tr><th>Completed</th><th>Order #</th><th>RO #</th><th>Vehicle</th><th>Customer</th><th>Services</th><th>Placed by</th><th style={{ textAlign: "right" }}>Amount</th></tr>
+                  <tr><th>Completed</th><th>Order #</th><th>RO #</th><th>Vehicle</th><th>VIN</th><th>Services</th><th>Placed by</th><th style={{ textAlign: "right" }}>Amount</th></tr>
                 </thead>
                 <tbody>
                   {st.lines.map((l: any) => (
@@ -107,8 +108,8 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
                       <td style={{ whiteSpace: "nowrap" }}>{nice(l.completed)}</td>
                       <td>{l.quote_number}</td>
                       <td>{l.ro || "—"}</td>
-                      <td><b>{l.vehicle}</b>{l.stock || l.vin ? <div style={{ fontSize: 11, color: "var(--text-3)" }}>{l.stock ? `Stock ${l.stock}` : ""}{l.stock && l.vin ? " · " : ""}{l.vin ? `VIN …${l.vin.slice(-8)}` : ""}</div> : null}</td>
-                      <td>{l.customer || "—"}</td>
+                      <td><b>{l.vehicle}</b></td>
+                      <td className="vin">{l.vin || "—"}</td>
                       <td>{l.services}</td>
                       <td>{l.placed_by || "—"}</td>
                       <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{money(l.amount)}</td>

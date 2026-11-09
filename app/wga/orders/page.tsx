@@ -149,7 +149,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
         <td><b>{o.quote_number}</b></td>
         <td>{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span className="status-pill cancelled" title={o.sm_sync_error}>SM failed</span> : <span style={{ color: "var(--text-3)" }}>—</span>}</td>
         <td>{o.dealer_dealerships?.name || "—"}<br /><span style={{ fontSize: 11 }}>{o.dealer_user_name || ""}</span></td>
-        <td><b>{o.vehicle_year} {o.vehicle_model}</b><br /><span style={{ fontSize: 11, color: "var(--gold-bright)" }}>{o.vehicle_trim}</span></td>
+        <td><b>{o.vehicle_year} {o.vehicle_model}</b><br /><span style={{ fontSize: 11, color: "var(--gold-bright)" }}>{o.vehicle_trim}</span>{o.vehicle_vin ? <div className="vin" style={{ fontSize: 11, color: "var(--text-3)" }}>…{o.vehicle_vin.slice(-8)}</div> : null}</td>
         <td>{lines.map((l) => l.name).join(", ")}</td>
         <td><span className={"status-pill " + o.status}>{(STATUSES.find((s) => s[0] === o.status) || [o.status, o.status])[1]}</span>{o.scheduled_date ? <div style={{ fontSize: 11, marginTop: 4 }}>{o.scheduled_date}</div> : null}</td>
         <td>{o.assigned_name || "—"}</td>
@@ -171,9 +171,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
             </div>
             <div className="detail-meta">
               {o.available_from || o.needed_by ? <span>Window <b>{o.available_from || "any"} → {o.needed_by || "no deadline"}</b></span> : null}
-              {o.vehicle_vin ? <span>VIN <b>{o.vehicle_vin}</b></span> : null}
-              {o.stock_number ? <span>Stock <b>{o.stock_number}</b></span> : null}
-              {o.customer_name ? <span>Customer <b>{o.customer_name}</b>{o.customer_phone ? ` · ${o.customer_phone}` : ""}</span> : null}
+              {o.vehicle_vin ? <span>VIN <b className="vin">{o.vehicle_vin}</b></span> : null}
               {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
               {o.sm_order_number ? <span>ShopMonkey <b>RO {o.sm_order_number}</b>{o.sm_synced_at ? ` · ${new Date(o.sm_synced_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
               {!o.sm_order_number ? (
@@ -218,7 +216,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
           <span>{o.dealer_dealerships?.name || "—"}</span>
           <span>{new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric" })} {new Date(when).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
           {o.dealer_user_name ? <span>{o.dealer_user_name}</span> : null}
-          {o.stock_number ? <span>Stock {o.stock_number}</span> : null}
+          {o.vehicle_vin ? <span className="vin">VIN …{o.vehicle_vin.slice(-8)}</span> : null}
           {o.assigned_name ? <span>→ {o.assigned_name}</span> : null}
           {o.scheduled_date ? <span>Sched {o.scheduled_date}</span> : null}
         </div>
@@ -242,8 +240,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
           </div>
           <div className="detail-meta" style={{ marginTop: 12 }}>
             <span>Quote <b>{o.quote_number}</b></span>
-            {o.vehicle_vin ? <span>VIN <b>{o.vehicle_vin}</b></span> : null}
-            {o.customer_name ? <span>Customer <b>{o.customer_name}</b>{o.customer_phone ? ` · ${o.customer_phone}` : ""}</span> : null}
+            {o.vehicle_vin ? <span>VIN <b className="vin">{o.vehicle_vin}</b></span> : null}
             {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
             {o.sm_order_number ? <span>ShopMonkey <b>RO {o.sm_order_number}</b></span> : (
               <span>ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b></span>

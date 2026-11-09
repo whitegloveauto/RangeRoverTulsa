@@ -34,10 +34,8 @@ export interface StatementLine {
   completed: string; // YYYY-MM-DD (Tulsa)
   quote_number: string;
   ro: string;
-  stock: string;
   vin: string;
   vehicle: string;
-  customer: string;
   services: string;
   placed_by: string;
   amount: number; // WGA bills the dealership
@@ -55,7 +53,7 @@ export async function buildStatement(dealershipId: string, monthKey: string) {
   // Candidates: completed orders whose status changed on/after the month start (completion can't be later than that).
   const { data: qs } = await supabaseAdmin
     .from("dealer_quotes")
-    .select("id, quote_number, sm_order_number, stock_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, customer_name, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at")
+    .select("id, quote_number, sm_order_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at")
     .eq("dealership_id", dealershipId)
     .eq("status", "complete")
     .gte("status_updated_at", new Date(start - 86400000).toISOString())
@@ -80,10 +78,8 @@ export async function buildStatement(dealershipId: string, monthKey: string) {
       completed: localDate(at),
       quote_number: q.quote_number || "",
       ro: q.sm_order_number || "",
-      stock: q.stock_number || "",
       vin: q.vehicle_vin || "",
       vehicle: `${q.vehicle_year} ${q.vehicle_model} ${q.vehicle_trim}`,
-      customer: q.customer_name || "",
       services: (Array.isArray(q.line_items) ? q.line_items : []).map((l: any) => l.name).join("; "),
       placed_by: q.dealer_user_name || "",
       amount: Number(q.cost_total || 0),
@@ -117,9 +113,9 @@ const cell = (v: unknown) => {
 };
 
 export function statementCsv(st: Statement, includeRetail: boolean): string {
-  const head = ["Completed", "Order #", "RO #", "Stock #", "VIN", "Vehicle", "Customer", "Services", "Placed by", "Amount (WGA)", ...(includeRetail ? ["Your retail"] : [])];
-  const rows = st.lines.map((l) => [l.completed, l.quote_number, l.ro, l.stock, l.vin, l.vehicle, l.customer, l.services, l.placed_by, l.amount.toFixed(2), ...(includeRetail ? [l.retail.toFixed(2)] : [])]);
-  const foot = [["", "", "", "", "", "", "", "", `TOTAL (${st.count} orders) · Net ${st.terms} · due ${st.dueDate}`, st.total.toFixed(2), ...(includeRetail ? [st.retailTotal.toFixed(2)] : [])]];
+  const head = ["Completed", "Order #", "RO #", "VIN", "Vehicle", "Services", "Placed by", "Amount (WGA)", ...(includeRetail ? ["Your retail"] : [])];
+  const rows = st.lines.map((l) => [l.completed, l.quote_number, l.ro, l.vin, l.vehicle, l.services, l.placed_by, l.amount.toFixed(2), ...(includeRetail ? [l.retail.toFixed(2)] : [])]);
+  const foot = [["", "", "", "", "", "", `TOTAL (${st.count} orders) · Net ${st.terms} · due ${st.dueDate}`, st.total.toFixed(2), ...(includeRetail ? [st.retailTotal.toFixed(2)] : [])]];
   return [head, ...rows, ...foot].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
 

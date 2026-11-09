@@ -48,7 +48,7 @@ export const DEALER_STATUS_LABEL: Record<string, string> = {
 };
 
 const QUOTE_FIELDS =
-  "id, quote_number, dealership_id, dealer_user_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, scheduled_date, needed_by, sm_order_number, status, line_items, dealer_dealerships(name, short_name)";
+  "id, quote_number, dealership_id, dealer_user_id, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, scheduled_date, needed_by, sm_order_number, status, line_items, dealer_dealerships(name, short_name)";
 
 type OrderEvent =
   | { kind: "status"; status: string }
@@ -66,13 +66,11 @@ export async function emailOrderEvent(quoteId: string, ev: OrderEvent) {
     const base = await siteUrlFor(q.dealership_id);
     const d: any = (q as any).dealer_dealerships || {};
     const vehicle = `${q.vehicle_year} ${q.vehicle_model}`;
-    const tag = q.stock_number ? ` · Stock ${q.stock_number}` : q.customer_name ? ` · ${q.customer_name}` : "";
+    const tag = q.vehicle_vin ? ` · VIN …${String(q.vehicle_vin).slice(-8)}` : "";
     const services = (Array.isArray(q.line_items) ? q.line_items : []).map((l: any) => l.name).join(", ");
     const rows: [string, string][] = [
       ["Vehicle", `${q.vehicle_year} ${q.vehicle_model} ${q.vehicle_trim}`],
-      ["Stock #", q.stock_number || ""],
       ["VIN", q.vehicle_vin || ""],
-      ["Customer", q.customer_name || ""],
       ["Services", services],
       ["Order", `${q.quote_number}${q.sm_order_number ? ` · RO ${q.sm_order_number}` : ""}`],
     ];
@@ -140,7 +138,7 @@ export async function emailComebackEvent(comebackId: string, change: { status?: 
   try {
     const { data: c } = await supabaseAdmin
       .from("dealer_comebacks")
-      .select("id, comeback_number, dealership_id, created_by_user_id, customer_name, vehicle, vin, category, description, status, scheduled_date, wga_notes, dealer_dealerships(name, short_name)")
+      .select("id, comeback_number, dealership_id, created_by_user_id, vehicle, vin, category, description, status, scheduled_date, wga_notes, dealer_dealerships(name, short_name)")
       .eq("id", comebackId)
       .maybeSingle();
     if (!c) return;
@@ -148,7 +146,7 @@ export async function emailComebackEvent(comebackId: string, change: { status?: 
     if (!to.length) return;
     const base = await siteUrlFor(c.dealership_id);
     const d: any = (c as any).dealer_dealerships || {};
-    const what = c.vehicle || c.customer_name || c.vin || "your comeback";
+    const what = c.vehicle || c.vin || "your comeback";
     const status = change.status || c.status;
     const when = fmtDate(c.scheduled_date);
     const heading =
@@ -169,7 +167,7 @@ export async function emailComebackEvent(comebackId: string, change: { status?: 
         ["Status", CB_LABEL[status] || status],
         ["Return date", when],
         ["Vehicle", c.vehicle || ""],
-        ["Customer", c.customer_name || ""],
+        ["VIN", c.vin || ""],
         ["Issue", c.description || ""],
       ],
       cta: { href: `${base}/portal/comebacks`, label: "View comebacks" },

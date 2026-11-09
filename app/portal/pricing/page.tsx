@@ -16,9 +16,6 @@ export default function PricingPage() {
   const [vehicle, setVehicle] = useState<{ year: number; model: string; trim: string } | null>(null);
   const [book, setBook] = useState<PricingBook | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [stockNumber, setStockNumber] = useState("");
   const [vin, setVin] = useState("");
   const [notes, setNotes] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
@@ -67,8 +64,16 @@ export default function PricingPage() {
     });
   }
 
+  // 17 characters, no I / O / Q (VIN alphabet)
+  const vinOk = /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
+
   async function save(submit: boolean, confirmDuplicate = false) {
     if (!vehicle || !selected.size) return;
+    if (submit && !vinOk) {
+      setMsg({ text: vin ? `That VIN has ${vin.length} characters — it needs 17 (no I, O or Q).` : "Enter the VIN to submit the order.", err: true });
+      document.getElementById("vin")?.focus();
+      return;
+    }
     setBusy(true);
     setMsg({ text: "" });
     setDup(null);
@@ -80,11 +85,8 @@ export default function PricingPage() {
         vehicleModel: vehicle.model,
         vehicleTrim: vehicle.trim,
         vehicleVin: vin,
-        stockNumber,
         availableFrom,
         neededBy,
-        customerName,
-        customerPhone,
         notes,
         itemIds: Array.from(selected),
         submit,
@@ -204,10 +206,11 @@ export default function PricingPage() {
               </div>
             </div>
             <div className="db-fields">
-              <div className="field"><label htmlFor="cust">Customer name</label><input id="cust" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Optional for a quote" /></div>
-              <div className="field"><label htmlFor="phone">Customer phone</label><input id="phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Optional" /></div>
-              <div className="field"><label htmlFor="stock">Stock #</label><input id="stock" value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} /></div>
-              <div className="field"><label htmlFor="vin">VIN</label><input id="vin" value={vin} onChange={(e) => setVin(e.target.value)} placeholder="17 characters" /></div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <label htmlFor="vin">VIN {vin ? <span style={{ color: vinOk ? "var(--gold)" : "var(--text-3)", letterSpacing: 0, textTransform: "none" }}>· {vinOk ? "✓" : `${vin.length}/17`}</span> : null}</label>
+                <input id="vin" value={vin} maxLength={17} autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }}
+                  onChange={(e) => setVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))} placeholder="17 characters — required to submit" />
+              </div>
               <div className="field"><label htmlFor="avail">Vehicle available from</label><input id="avail" type="date" value={availableFrom} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setAvailableFrom(e.target.value)} /></div>
               <div className="field"><label htmlFor="needed">Needed back by</label><input id="needed" type="date" value={neededBy} min={availableFrom || new Date().toISOString().slice(0, 10)} onChange={(e) => setNeededBy(e.target.value)} /></div>
               <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="notes">Notes for White Glove Auto</label><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special requests…" /></div>
@@ -230,7 +233,7 @@ export default function PricingPage() {
             <div className="db-note" style={{ color: msg.err ? "var(--warn)" : undefined }}>
               {msg.text || (
                 <>
-                  <b>Save quote</b> keeps it for later. <b>Submit order</b> sends the vehicle and selected services to White Glove Auto for scheduling.
+                  <b>Save quote</b> keeps it for later (VIN optional). <b>Submit order</b> sends the VIN and selected services to White Glove Auto for scheduling.
                 </>
               )}
             </div>

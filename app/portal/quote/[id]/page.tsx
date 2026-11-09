@@ -215,7 +215,7 @@ function QuoteSheetInner() {
                     marginTop: 2,
                   }}
                 >
-                  {quote.customer_name || dealership?.name || "—"}
+                  {dealership?.name || "—"}
                 </div>
               </div>
             </div>
@@ -281,9 +281,7 @@ function QuoteSheetInner() {
                 </span>
               </div>
               <div style={{ display: "flex", gap: 24, marginTop: 8, fontSize: 11, color: "#555", flexWrap: "wrap" }}>
-                {quote.vehicle_vin && <span>VIN: {quote.vehicle_vin}</span>}
-                {quote.stock_number && <span>Stock #: {quote.stock_number}</span>}
-                {quote.customer_name && <span>Customer: {quote.customer_name}</span>}
+                {quote.vehicle_vin && <span>VIN: <span className="vin">{quote.vehicle_vin}</span></span>}
                 {quote.available_from && <span>Available from: {quote.available_from}</span>}
                 {quote.needed_by && <span>Needed back by: {quote.needed_by}</span>}
                 {quote.sm_order_number && <span>WGA ticket: RO {quote.sm_order_number}</span>}

@@ -33,7 +33,7 @@ export default function OrdersPage() {
     if (filter === "draft" && r.status !== "draft") return false;
     if (filter === "complete" && r.status !== "complete" && r.status !== "cancelled") return false;
     if (!needle) return true;
-    const hay = [r.quote_number, r.vehicle_year, r.vehicle_model, r.vehicle_trim, r.stock_number, r.customer_name, r.sm_order_number, r.dealer_user_name, ...(r.line_items || []).map((l: any) => l.name)].join(" ").toLowerCase();
+    const hay = [r.quote_number, r.vehicle_year, r.vehicle_model, r.vehicle_trim, r.vehicle_vin, r.sm_order_number, r.dealer_user_name, ...(r.line_items || []).map((l: any) => l.name)].join(" ").toLowerCase();
     return hay.includes(needle);
   });
   const emptyText = rows.length === 0 ? "Nothing yet. Tap New Quote, pick the vehicle, choose the protection and send it — it shows up here with its ticket number." : needle ? "No orders match that search." : filter === "open" ? "No open orders. Switch to All to see completed ones." : "Nothing here.";
@@ -54,7 +54,7 @@ export default function OrdersPage() {
             <div className="tabs" style={{ margin: 0, borderBottom: 0 }}>
               {([["open", "Open"], ["all", "All"], ["draft", "Quotes"], ["complete", "Done"]] as const).map(([k, l]) => <button key={k} className={filter === k ? "active" : ""} onClick={() => setFilter(k)}>{l}</button>)}
             </div>
-            <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customer, stock #, VIN, RO…" aria-label="Search orders" />
+            <input className="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN (or last 6), model, RO…" aria-label="Search orders" />
           </div>
           {/* Phone: one card per order */}
           {isPhone ? <div className="order-cards">
@@ -68,8 +68,7 @@ export default function OrdersPage() {
                 <div className="oc-vehicle">{q.vehicle_year} {q.vehicle_model} <span>{q.vehicle_trim}</span></div>
                 <div className="oc-services">{(q.line_items || []).map((l: any) => l.name).join(" · ") || "—"}</div>
                 <div className="oc-meta">
-                  {q.customer_name ? <span>{q.customer_name}</span> : null}
-                  {q.stock_number ? <span>Stock {q.stock_number}</span> : null}
+                  {q.vehicle_vin ? <span className="vin">VIN {q.vehicle_vin}</span> : null}
                   {q.needed_by ? <span>Needed by {q.needed_by}</span> : null}
                   {q.scheduled_date ? <span>Scheduled {q.scheduled_date}</span> : null}
                   {q.sm_order_number ? <span>RO {q.sm_order_number}</span> : null}
@@ -86,7 +85,7 @@ export default function OrdersPage() {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Quote #</th><th>Vehicle</th><th>Services</th><th>Customer / Stock</th><th>By</th><th>Status</th><th style={{ textAlign: "right" }}>Total</th>{session.user.canSeeCost ? <th style={{ textAlign: "right" }}>Your cost</th> : null}
+                  <th>Quote #</th><th>Vehicle</th><th>Services</th><th>VIN</th><th>By</th><th>Status</th><th style={{ textAlign: "right" }}>Total</th>{session.user.canSeeCost ? <th style={{ textAlign: "right" }}>Your cost</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -96,7 +95,7 @@ export default function OrdersPage() {
                     <td><Link href={`/portal/quote/${q.id}`}><b>{q.quote_number}</b></Link>{q.sm_order_number ? <div style={{ fontSize: 11, color: "var(--gold-bright)" }}>RO {q.sm_order_number}</div> : null}</td>
                     <td><b>{q.vehicle_year} {q.vehicle_model}</b><br /><span style={{ fontSize: 11 }}>{q.vehicle_trim}</span></td>
                     <td>{(q.line_items || []).map((l: any) => l.name).join(", ") || "—"}</td>
-                    <td>{q.customer_name || "—"}{q.stock_number ? <><br /><span style={{ fontSize: 11 }}>Stock {q.stock_number}</span></> : null}</td>
+                    <td className="vin">{q.vehicle_vin || "—"}</td>
                     <td>{q.dealer_user_name || "—"}</td>
                     <td><span className={"status-pill " + q.status}>{STATUS_LABEL[q.status] || q.status}</span>{q.scheduled_date ? <div style={{ fontSize: 11, marginTop: 4 }}>{q.scheduled_date}</div> : null}</td>
                     <td className="num"><b>{money(q.retail_total)}</b></td>

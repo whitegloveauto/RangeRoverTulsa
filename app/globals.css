@@ -664,3 +664,6 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
   .stmt-page .tbl th, .stmt-page .tbl td { color: #111 !important; border-color: #ccc !important; padding: 5px 6px !important; background: #fff !important; }
   .stmt-page .tbl tr { break-inside: avoid; }
 }
+
+/* VINs: monospace so they read character-by-character */
+.vin { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.04em; font-size: 0.95em; white-space: nowrap; }

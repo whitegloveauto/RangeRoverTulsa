@@ -35,7 +35,7 @@ export default function WgaComebacksPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">COMEBACKS &amp; WARRANTY</div>
             <div className="stage-title">Make it right.</div>
-            <div className="stage-sub">Issues dealerships report on vehicles we&apos;ve already done. Each one is tied to the original order and customer. Schedule it, note what you found, and close it out.</div>
+            <div className="stage-sub">Issues dealerships report on vehicles we&apos;ve already done. Each one is tied to the original order by VIN. Schedule it, note what you found, and close it out.</div>
           </div>
           <div className="tabs">
             {[...STATUSES, ["all", "All"]].map(([k, l]) => <button key={k} className={filter === k ? "active" : ""} onClick={() => setFilter(k)}>{l}</button>)}
@@ -49,12 +49,11 @@ export default function WgaComebacksPage() {
                   <span className={"status-pill " + (c.status === "open" ? "new" : c.status === "scheduled" ? "scheduled" : c.status === "resolved" ? "complete" : "cancelled")}>{STATUSES.find((s) => s[0] === c.status)?.[1] || c.status}</span>
                   <span className="oc-num">{c.comeback_number} · {CATS[c.category] || c.category}</span>
                 </div>
-                <div className="oc-vehicle">{c.vehicle || "Vehicle"} <span>{c.customer_name || ""}{c.customer_phone ? ` · ${c.customer_phone}` : ""}</span></div>
+                <div className="oc-vehicle">{c.vehicle || "Vehicle"} {c.vin ? <span className="vin">VIN {c.vin}</span> : null}</div>
                 <div className="oc-services">{c.description}</div>
                 <div className="oc-meta">
                   <span>{c.dealer_dealerships?.short_name || c.dealer_dealerships?.name}</span>
                   <span>Filed {new Date(c.created_at).toLocaleDateString()} by {c.created_by_name}</span>
-                  {c.vin ? <span>VIN {c.vin}</span> : null}
                   {c.dealer_quotes ? <span>Original {c.dealer_quotes.quote_number}{c.dealer_quotes.sm_order_number ? ` · RO ${c.dealer_quotes.sm_order_number}` : ""}{c.dealer_quotes.submitted_at ? ` · ${new Date(c.dealer_quotes.submitted_at).toLocaleDateString()}` : ""} · {(c.dealer_quotes.line_items || []).map((l: any) => l.name).join(", ")}</span> : <span>No original order on file</span>}
                 </div>
                 <div className="oc-actions" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>

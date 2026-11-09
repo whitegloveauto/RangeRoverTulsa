@@ -15,7 +15,7 @@ export default function ComebacksPage() {
   const [results, setResults] = useState<any[]>([]);
   const [picked, setPicked] = useState<any | null>(null);
   const [manual, setManual] = useState(false);
-  const [form, setForm] = useState({ customer_name: "", customer_phone: "", vehicle: "", vin: "", category: "ppf", description: "" });
+  const [form, setForm] = useState({ vehicle: "", vin: "", category: "ppf", description: "" });
   const [msg, setMsg] = useState<{ text: string; ok?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,7 +44,7 @@ export default function ComebacksPage() {
     setMsg(null);
     const body: any = { category: form.category, description: form.description };
     if (picked) body.quote_id = picked.id;
-    else Object.assign(body, { customer_name: form.customer_name, customer_phone: form.customer_phone, vehicle: form.vehicle, vin: form.vin });
+    else Object.assign(body, { vehicle: form.vehicle, vin: form.vin });
     const r = await fetch("/api/comebacks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json();
     setBusy(false);
@@ -52,7 +52,7 @@ export default function ComebacksPage() {
     setMsg({ text: `Filed ${d.comeback.comeback_number}. White Glove Auto has been alerted and will reach out to schedule.`, ok: true });
     setPicked(null);
     setQ("");
-    setForm({ customer_name: "", customer_phone: "", vehicle: "", vin: "", category: "ppf", description: "" });
+    setForm({ vehicle: "", vin: "", category: "ppf", description: "" });
     load();
   }
 
@@ -66,39 +66,37 @@ export default function ComebacksPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">COMEBACKS &amp; WARRANTY</div>
             <div className="stage-title">Something needs a second look.</div>
-            <div className="stage-sub">A customer came back with a lifted edge, a bubble, a scratch in the film? Find the original job, tell us what&apos;s going on, and we&apos;ll take it from there. It stays on that customer&apos;s history.</div>
+            <div className="stage-sub">A customer came back with a lifted edge, a bubble, a scratch in the film? Find the original job, tell us what&apos;s going on, and we&apos;ll take it from there. It stays on that vehicle&apos;s history.</div>
           </div>
 
           <form className="card" onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             <div className="field">
               <label htmlFor="q">Find the original job</label>
-              <input id="q" value={q} onChange={(e) => { setQ(e.target.value); setPicked(null); }} placeholder="Customer name, VIN, stock #, phone or quote #" autoComplete="off" />
+              <input id="q" value={q} onChange={(e) => { setQ(e.target.value); setPicked(null); }} placeholder="VIN (or last 6), model, quote # or RO" autoComplete="off" />
             </div>
             {results.length && !picked ? (
               <div style={{ display: "grid", gap: 6 }}>
                 {results.map((r) => (
                   <button type="button" key={r.id} className="result-row" onClick={() => { setPicked(r); setResults([]); setQ(""); }}>
                     <b>{r.vehicle_year} {r.vehicle_model} {r.vehicle_trim}</b>
-                    <span>{r.customer_name || "no customer name"}{r.vehicle_vin ? ` · VIN ${r.vehicle_vin.slice(-8)}` : ""}{r.stock_number ? ` · Stock ${r.stock_number}` : ""} · {(r.line_items || []).map((l: any) => l.name).join(", ")}</span>
+                    <span>{r.vehicle_vin ? <span className="vin">VIN {r.vehicle_vin}</span> : "no VIN"} · {(r.line_items || []).map((l: any) => l.name).join(", ")}</span>
                     <span>{r.quote_number}{r.sm_order_number ? ` · RO ${r.sm_order_number}` : ""} · {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : ""}</span>
                   </button>
                 ))}
               </div>
             ) : null}
-            {q.trim().length >= 2 && results.length === 0 && !picked ? <div style={{ fontSize: 12, color: "var(--text-3)" }}>No past orders match. <button type="button" className="link-btn" onClick={() => setManual(true)}>Enter the customer and vehicle manually</button></div> : null}
+            {q.trim().length >= 2 && results.length === 0 && !picked ? <div style={{ fontSize: 12, color: "var(--text-3)" }}>No past orders match. <button type="button" className="link-btn" onClick={() => setManual(true)}>Enter the vehicle manually</button></div> : null}
             {picked ? (
               <div className="picked">
-                <div><b>{picked.vehicle_year} {picked.vehicle_model} {picked.vehicle_trim}</b> · {picked.customer_name || "—"}{picked.vehicle_vin ? ` · VIN ${picked.vehicle_vin}` : ""}</div>
+                <div><b>{picked.vehicle_year} {picked.vehicle_model} {picked.vehicle_trim}</b>{picked.vehicle_vin ? <> · <span className="vin">VIN {picked.vehicle_vin}</span></> : ""}</div>
                 <div style={{ fontSize: 11, color: "var(--text-3)" }}>{(picked.line_items || []).map((l: any) => l.name).join(", ")} · {picked.quote_number}{picked.sm_order_number ? ` · RO ${picked.sm_order_number}` : ""}</div>
                 <button type="button" className="link-btn" onClick={() => setPicked(null)}>Change</button>
               </div>
             ) : null}
             {manual && !picked ? (
               <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
-                <div className="field"><label>Customer name</label><input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
-                <div className="field"><label>Customer phone</label><input value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} /></div>
-                <div className="field"><label>Vehicle</label><input value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} placeholder="2025 Range Rover Sport Dynamic SE" /></div>
-                <div className="field"><label>VIN</label><input value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} /></div>
+                <div className="field"><label>VIN</label><input value={form.vin} maxLength={17} autoCapitalize="characters" autoCorrect="off" spellCheck={false} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17) })} placeholder="17 characters" /></div>
+                <div className="field"><label>Year / model</label><input value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} placeholder="2025 Range Rover Sport" /></div>
               </div>
             ) : null}
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 2fr" }} className="two">
@@ -117,7 +115,7 @@ export default function ComebacksPage() {
             {list.map((c) => (
               <div key={c.id} className="order-card">
                 <div className="oc-top"><span className={"status-pill " + (c.status === "open" ? "new" : c.status === "scheduled" ? "scheduled" : c.status === "resolved" ? "complete" : "cancelled")}>{STATUS_LABEL[c.status] || c.status}</span><span className="oc-num">{c.comeback_number}</span></div>
-                <div className="oc-vehicle">{c.vehicle || "Vehicle"} <span>{c.customer_name || ""}</span></div>
+                <div className="oc-vehicle">{c.vehicle || "Vehicle"} {c.vin ? <span className="vin">VIN {c.vin}</span> : null}</div>
                 <div className="oc-services">{c.description}</div>
                 <div className="oc-meta">
                   <span>{CATS.find((x) => x[0] === c.category)?.[1]}</span>

@@ -16,7 +16,7 @@ export async function GET() {
   let q = supabaseAdmin
     .from("dealer_quotes")
     .select(
-      "id, quote_number, vehicle_year, vehicle_model, vehicle_trim, stock_number, customer_name, line_items, retail_total, cost_total, gross_total, status, scheduled_date, submitted_at, created_at, dealer_user_name, available_from, needed_by, urgency, sm_order_number"
+      "id, quote_number, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, line_items, retail_total, cost_total, gross_total, status, scheduled_date, submitted_at, created_at, dealer_user_name, available_from, needed_by, urgency, sm_order_number"
     )
     .eq("dealership_id", session.dealershipId)
     .order("created_at", { ascending: false })
@@ -30,7 +30,8 @@ export async function GET() {
 }
 
 // POST /api/quotes — save a quote (draft) or submit an order.
-// body: { vehicleYear, vehicleModel, vehicleTrim, vehicleVin?, stockNumber?, customerName?, customerPhone?, customerEmail?, notes?, itemIds: string[], submit: boolean }
+// body: { vehicleYear, vehicleModel, vehicleTrim, vehicleVin (required to submit), notes?, availableFrom?, neededBy?, itemIds: string[], submit: boolean, confirmDuplicate? }
+// Orders are tracked by VIN + year/make/model only — the dealership looks up its own customer by VIN.
 // Prices are re-read server-side from the pricing book so the client can't alter them.
 export async function POST(req: Request) {
   const session = await getSession();
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  const { vehicleYear, vehicleModel, vehicleTrim, vehicleVin, stockNumber, customerName, customerPhone, customerEmail, notes, itemIds, submit, availableFrom, neededBy } = body;
+  const { vehicleYear, vehicleModel, vehicleTrim, vehicleVin, notes, itemIds, submit, availableFrom, neededBy } = body;
   const isoDate = (v: any) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   const availDate = isoDate(availableFrom);
   const needDate = isoDate(neededBy);
@@ -50,13 +51,16 @@ export async function POST(req: Request) {
   if (!vehicleYear || !vehicleModel || !vehicleTrim) {
     return NextResponse.json({ error: "Vehicle year, model, and trim are required." }, { status: 400 });
   }
-  const vinNorm = typeof vehicleVin === "string" ? vehicleVin.replace(/\s+/g, "").toUpperCase() : "";
-  const stockNorm = typeof stockNumber === "string" ? stockNumber.trim() : "";
+  const vinNorm = typeof vehicleVin === "string" ? vehicleVin.replace(/[^A-Za-z0-9]/g, "").toUpperCase() : "";
+  if (submit && !/^[A-HJ-NPR-Z0-9]{17}$/.test(vinNorm)) {
+    return NextResponse.json({ error: "Enter the full 17-character VIN to submit the order." }, { status: 400 });
+  }
+  if (vinNorm && vinNorm.length !== 17) return NextResponse.json({ error: "VIN needs 17 characters." }, { status: 400 });
 
-  // Same car ordered twice? Check this dealership's live orders from the last 30 days by VIN or stock #.
-  if (submit && !body.confirmDuplicate && (vinNorm.length >= 11 || stockNorm)) {
+  // Same car ordered twice? Check this dealership's live orders from the last 30 days by VIN.
+  if (submit && !body.confirmDuplicate) {
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
-    const ors = [vinNorm.length >= 11 ? `vehicle_vin.ilike.${vinNorm.replace(/[%_,()]/g, "")}` : "", stockNorm ? `stock_number.ilike.${stockNorm.replace(/[%_,()]/g, "")}` : ""].filter(Boolean).join(",");
+    const ors = `vehicle_vin.ilike.${vinNorm}`;
     const { data: dups } = await supabaseAdmin
       .from("dealer_quotes")
       .select("id, quote_number, status, submitted_at, vehicle_vin, stock_number, dealer_user_name, line_items, sm_order_number")
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
             submitted_at: d.submitted_at,
             by: d.dealer_user_name,
             ro: d.sm_order_number,
-            match: vinNorm.length >= 11 && (d.vehicle_vin || "").toUpperCase() === vinNorm ? "VIN" : "stock #",
+            match: "VIN",
             services: (Array.isArray(d.line_items) ? d.line_items : []).map((l: any) => l.name).join(", "),
           },
         },
@@ -121,10 +125,6 @@ export async function POST(req: Request) {
       vehicle_model: vehicleModel,
       vehicle_trim: vehicleTrim,
       vehicle_vin: vinNorm || null,
-      stock_number: stockNorm || null,
-      customer_name: customerName || null,
-      customer_phone: customerPhone || null,
-      customer_email: customerEmail || null,
       notes: notes || null,
       available_from: availDate,
       needed_by: needDate,
