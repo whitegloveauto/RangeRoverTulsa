@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authClient, loadProfile, portalState, nextPath, issueSession, issueDeviceCookie } from "@/lib/wgaAuth";
+import { authClient, loadProfile, portalState, nextPath, issueSession, issueDeviceCookie, explainSignInFailure } from "@/lib/wgaAuth";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,10 @@ export async function POST(req: Request) {
   if (!email || !password) return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
 
   const { data: signIn, error: signErr } = await authClient().auth.signInWithPassword({ email, password });
-  if (signErr || !signIn.user) return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+  if (signErr || !signIn.user) {
+    const f = await explainSignInFailure(email, signErr, "sign-in");
+    return NextResponse.json({ error: f.error }, { status: f.status });
+  }
 
   const p = await loadProfile(email);
   if (typeof p === "string") return NextResponse.json({ error: p }, { status: 403 });

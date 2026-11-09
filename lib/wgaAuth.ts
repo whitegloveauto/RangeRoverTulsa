@@ -19,6 +19,36 @@ export function authClient() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+// Turn a Supabase Auth sign-in error into an honest message (wrong password vs. rate limit vs.
+// service trouble) and log what happened — never the password — so a failed sign-in can be traced.
+export async function explainSignInFailure(email: string, err: any, where: string) {
+  const code: string = err?.code || "";
+  const status: number = Number(err?.status || 0);
+  let diag = "";
+  try {
+    const { data: prof } = await supabaseAdmin.from("profiles").select("id, active").eq("email", email).maybeSingle();
+    if (!prof) diag = "no profile for this email";
+    else {
+      const { data } = await authClient().auth.admin.getUserById(prof.id);
+      const u: any = data?.user;
+      diag = u
+        ? `profile active=${prof.active} auth: updated_at=${u.updated_at} last_sign_in_at=${u.last_sign_in_at} confirmed=${!!u.email_confirmed_at} banned_until=${u.banned_until || "-"}`
+        : `profile active=${prof.active} but no auth user with id ${prof.id}`;
+    }
+  } catch (e: any) {
+    diag = `lookup failed: ${e?.message || e}`;
+  }
+  console.log(`[wga ${where} failed] email=${email} code=${code || "-"} status=${status || "-"} msg="${String(err?.message || "").slice(0, 120)}" ${diag}`);
+
+  if (code === "over_request_rate_limit" || status === 429)
+    return { status: 429, error: "Too many sign-in attempts in a short time. Wait 5 minutes and try again." };
+  if (code === "email_not_confirmed") return { status: 403, error: "This email isn't confirmed in the White Glove login system — that's an account setting, not your password." };
+  if (code === "user_banned") return { status: 403, error: "This login is switched off in the White Glove login system." };
+  if (!status || status >= 500 || code === "request_timeout" || code === "unexpected_failure")
+    return { status: 503, error: "The White Glove login service didn't answer. Try again in a minute." };
+  return { status: 401, error: "Incorrect email or password." };
+}
+
 export interface WgaProfile {
   id: string;
   email: string;

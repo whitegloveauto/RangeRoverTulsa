@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWgaSession } from "@/lib/session";
-import { authClient, portalState } from "@/lib/wgaAuth";
+import { authClient, portalState, explainSignInFailure } from "@/lib/wgaAuth";
 
 export const runtime = "nodejs";
 
@@ -23,7 +23,10 @@ export async function POST(req: Request) {
 
   const ac = authClient();
   const { error: signErr } = await ac.auth.signInWithPassword({ email: s.userEmail, password: current });
-  if (signErr) return NextResponse.json({ error: "Current password is incorrect." }, { status: 401 });
+  if (signErr) {
+    const f = await explainSignInFailure(s.userEmail, signErr, "password-change check");
+    return NextResponse.json({ error: f.status === 401 ? "Current password is incorrect." : f.error }, { status: f.status });
+  }
 
   const { error } = await ac.auth.admin.updateUserById(s.userId, { password: next });
   if (error) return NextResponse.json({ error: "Could not change password." }, { status: 500 });
