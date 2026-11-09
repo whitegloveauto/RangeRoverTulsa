@@ -1,3 +1,4 @@
+import { brandLogos } from "@/lib/brandLogo";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -15,7 +16,7 @@ export async function GET() {
   ]);
   const { data: brands } = await supabaseAdmin.from("dealer_brands").select("key, name, make, logo_light_url, theme, tagline").order("name");
   if (d.error || u.error) return NextResponse.json({ error: "Could not load dealerships." }, { status: 500 });
-  return NextResponse.json({ dealerships: d.data || [], users: u.data || [], brands: brands || [] });
+  return NextResponse.json({ dealerships: d.data || [], users: u.data || [], brands: (brands || []).map((b: any) => ({ ...b, logo_light_url: brandLogos(b).screen })) });
 }
 
 // POST — actions
@@ -79,6 +80,11 @@ export async function POST(req: Request) {
     case "dealership.update": {
       const patch: any = { updated_at: new Date().toISOString() };
       for (const k of ["name", "short_name", "location", "active", "hide_cost_from_users", "billing_terms", "brand_key", "logo_url", "theme_override"]) if (b[k] !== undefined) patch[k] = b[k];
+      if (b.billing_terms !== undefined) {
+        const n = Number(b.billing_terms);
+        if (!Number.isInteger(n) || n < 0 || n > 180) return fail("Net terms must be a whole number of days (0–180).", 400);
+        patch.billing_terms = n;
+      }
       if (b.hostnames !== undefined) patch.hostnames = String(Array.isArray(b.hostnames) ? b.hostnames.join(",") : b.hostnames).split(/[,\s]+/).map((h: string) => h.trim().toLowerCase()).filter(Boolean);
       if (b.brand_key) {
         const { data: br } = await supabaseAdmin.from("dealer_brands").select("make").eq("key", b.brand_key).maybeSingle();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanChange, cleanVin } from "@/lib/caret";
 import AppHeader from "@/components/AppHeader";
 import { useDealerSession } from "@/lib/useDealerSession";
 
@@ -95,13 +96,13 @@ export default function ComebacksPage() {
             ) : null}
             {manual && !picked ? (
               <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
-                <div className="field"><label>VIN</label><input value={form.vin} maxLength={17} autoCapitalize="characters" autoCorrect="off" spellCheck={false} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }} onChange={(e) => setForm({ ...form, vin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17) })} placeholder="17 characters" /></div>
-                <div className="field"><label>Year / model</label><input value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value })} placeholder="2025 Range Rover Sport" /></div>
+                <div className="field"><label>VIN</label><input value={form.vin} autoCapitalize="characters" autoCorrect="off" spellCheck={false} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }} onChange={(e) => cleanChange(e, cleanVin, (vin) => setForm((f) => ({ ...f, vin })))} placeholder="17 characters" /></div>
+                <div className="field"><label>Year / model</label><input value={form.vehicle} onChange={(e) => { const v = e.target.value; setForm((p) => ({ ...p, vehicle: v })); }} placeholder="2025 Range Rover Sport" /></div>
               </div>
             ) : null}
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 2fr" }} className="two">
-              <div className="field"><label>What it&apos;s about</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
-              <div className="field"><label>What&apos;s going on</label><textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Where on the vehicle, what it looks like, when the customer noticed it, and when they can bring it in." required style={{ width: "100%", background: "var(--bg)", border: "1px solid var(--stroke)", color: "var(--text)", padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5 }} /></div>
+              <div className="field"><label>What it&apos;s about</label><select value={form.category} onChange={(e) => { const v = e.target.value; setForm((p) => ({ ...p, category: v })); }}>{CATS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+              <div className="field"><label>What&apos;s going on</label><textarea rows={3} value={form.description} onChange={(e) => { const v = e.target.value; setForm((p) => ({ ...p, description: v })); }} placeholder="Where on the vehicle, what it looks like, when the customer noticed it, and when they can bring it in." required style={{ width: "100%", background: "var(--bg)", border: "1px solid var(--stroke)", color: "var(--text)", padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5 }} /></div>
             </div>
             {msg ? <div className={"notice " + (msg.ok ? "ok" : "warn")}>{msg.text}</div> : null}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>

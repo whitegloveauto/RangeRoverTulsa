@@ -1,15 +1,130 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { PricingBook } from "@/lib/types";
+import { cleanChange } from "@/lib/caret";
 
 // Editable per-model price grid.
 //  mode "wga":    edits cost + suggested retail (WGA admin). Can rename/add/remove packages.
 //  mode "dealer": edits the dealership's own retail; shows WGA cost + suggested read-only.
-// Saves are debounced and sent as a batch of changed cells.
+//
+// Typing has to feel like a plain text box, so:
+//  - each price box owns what's on screen while it has focus; nothing from the server
+//    ever overwrites a box someone is typing in
+//  - edits that haven't been confirmed by the server survive any reload of the book
+//  - saves are debounced, sent one at a time (never out of order), carry the whole cell,
+//    and flush immediately when you leave a box
+//  - a keystroke only re-renders the box being typed in, not the whole grid
 
 type Cell = { cost: number | null; suggested_retail: number | null; retail: number | null };
 export type GridChange = { model: string; item_id: string } & Partial<Cell>;
+type Field = keyof Cell;
+type Book = Record<string, Record<string, Cell>>;
+
+const EMPTY: Cell = { cost: null, suggested_retail: null, retail: null };
+const SEP = "\u0001";
+const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+const raw = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+const cleanMoney = (s: string) => {
+  const t = s.replace(/[^0-9.]/g, "");
+  const i = t.indexOf(".");
+  return (i === -1 ? t : t.slice(0, i + 1) + t.slice(i + 1).replace(/\./g, "").slice(0, 2)).slice(0, 9);
+};
+const parse = (s: string): number | null => (s === "" || s === "." ? null : Number(s));
+function fromBook(book: PricingBook): Book {
+  const out: Book = {};
+  for (const m of book.models) {
+    out[m] = {};
+    for (const k of Object.keys(book.prices[m] || {})) out[m][k] = { ...book.prices[m][k] };
+  }
+  return out;
+}
+
+// One price box. While focused it shows exactly what was typed (no commas, cursor stays put);
+// on blur it shows the formatted number. Server updates only land while it isn't focused.
+const PriceInput = memo(function PriceInput({
+  id,
+  value,
+  placeholder,
+  edit,
+  done,
+  cellKey,
+  field,
+}: {
+  id: string;
+  value: number | null;
+  placeholder: string;
+  edit: (cellKey: string, field: Field, v: number | null) => void;
+  done: () => void;
+  cellKey: string;
+  field: Field;
+}) {
+  const [text, setText] = useState(fmt(value));
+  const focused = useRef(false);
+  const justFocused = useRef(false);
+  const keyedSinceFocus = useRef(false);
+  const current = useRef<number | null>(value);
+  useEffect(() => {
+    if (!focused.current) {
+      current.current = value;
+      setText(fmt(value));
+    }
+  }, [value]);
+  return (
+    <input
+      id={id}
+      inputMode="decimal"
+      enterKeyHint="next"
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      placeholder={placeholder}
+      value={text}
+      onPointerDown={() => {
+        if (!focused.current) justFocused.current = true; // this tap/click is what's focusing the box
+      }}
+      onFocus={(e) => {
+        focused.current = true;
+        keyedSinceFocus.current = false;
+        setText(raw(current.current));
+        // Keyboard focus (Tab / Next): select the number right away so typing replaces it.
+        // Tap/click focus: select on release instead (the press would otherwise drop a cursor and undo it).
+        if (!justFocused.current) {
+          const el = e.target;
+          setTimeout(() => {
+            if (document.activeElement === el && !keyedSinceFocus.current) el.select();
+          }, 0);
+        }
+      }}
+      onMouseUp={(e) => {
+        if (!justFocused.current) return;
+        justFocused.current = false;
+        if (keyedSinceFocus.current) return;
+        e.preventDefault();
+        (e.target as HTMLInputElement).select(); // tap again to put the cursor somewhere instead
+      }}
+      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+        cleanChange(e, cleanMoney, (t) => {
+          keyedSinceFocus.current = true;
+          setText(t);
+          current.current = parse(t);
+          edit(cellKey, field, current.current);
+        })
+      }
+      onBlur={() => {
+        focused.current = false;
+        justFocused.current = false;
+        setText(fmt(current.current));
+        done();
+      }}
+      onKeyDown={(e) => {
+        keyedSinceFocus.current = true;
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
+});
 
 export default function PriceGrid({
   book,
@@ -34,51 +149,94 @@ export default function PriceGrid({
   onMove?: (kind: "service" | "item", id: string, dir: -1 | 1) => Promise<void>;
   showInactive?: boolean;
 }) {
-  const [local, setLocal] = useState<Record<string, Record<string, Cell>>>({});
-  const [status, setStatus] = useState<{ text: string; kind: "" | "ok" | "err" }>({ text: "", kind: "" });
-  const pending = useRef<Map<string, GridChange>>(new Map());
+  const local = useRef<Book | null>(null);
+  if (local.current === null) local.current = fromBook(book); // first paint already has the numbers
+  const [, setTick] = useState(0); // re-render after the book (server data) changes
+  const [status, setStatusState] = useState<{ text: string; kind: "" | "ok" | "err" }>({ text: "", kind: "" });
+  const setStatus = useCallback((text: string, kind: "" | "ok" | "err") => setStatusState((s) => (s.text === text && s.kind === kind ? s : { text, kind })), []);
+  const pending = useRef<Set<string>>(new Set()); // cells edited since the last save went out
+  const dirty = useRef<Set<string>>(new Set()); // cells whose typed value the server hasn't confirmed yet
+  const saving = useRef(false);
   const timer = useRef<any>(null);
+  const saveRef = useRef(onSave);
+  saveRef.current = onSave;
   // Phones show one package column at a time (chips pick which); desktop shows them all.
   const [mobilePkg, setMobilePkg] = useState<Record<string, string>>({});
 
+  // New server data: take it, except for cells with edits still on their way.
   useEffect(() => {
-    // Deep copy so inputs are controlled from local state
-    const copy: Record<string, Record<string, Cell>> = {};
-    for (const m of book.models) {
-      copy[m] = {};
-      for (const k of Object.keys(book.prices[m] || {})) copy[m][k] = { ...book.prices[m][k] };
+    const next = fromBook(book);
+    for (const key of Array.from(dirty.current)) {
+      const [m, k] = key.split(SEP);
+      const mine = local.current?.[m]?.[k];
+      if (mine) (next[m] = next[m] || {})[k] = { ...mine };
     }
-    setLocal(copy);
+    local.current = next;
+    setTick((t) => t + 1);
   }, [book]);
 
-  const fmt = (v: number | null) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 }));
-  const parse = (s: string): number | null => {
-    const n = s.replace(/[^0-9.]/g, "");
-    return n === "" ? null : Number(n);
-  };
-
-  function queue(model: string, itemId: string, field: keyof Cell, value: number | null) {
-    setLocal((cur) => ({ ...cur, [model]: { ...cur[model], [itemId]: { ...cur[model][itemId], [field]: value } } }));
-    const key = model + "|" + itemId;
-    const prev = pending.current.get(key) || { model, item_id: itemId };
-    pending.current.set(key, { ...prev, [field]: value });
-    setStatus({ text: "Unsaved changes…", kind: "" });
+  const flush = useCallback(async () => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(flush, 800);
-  }
-
-  async function flush() {
-    const changes = Array.from(pending.current.values());
-    if (!changes.length) return;
+    if (saving.current || !pending.current.size) return;
+    const keys = Array.from(pending.current);
     pending.current.clear();
+    const sent = keys.map((key) => {
+      const [model, item_id] = key.split(SEP);
+      const c = local.current?.[model]?.[item_id] || EMPTY;
+      return { model, item_id, cost: c.cost, suggested_retail: c.suggested_retail, retail: c.retail };
+    });
+    saving.current = true;
+    setStatus("Saving…", "");
+    let failed = false;
     try {
-      await onSave(changes);
-      setStatus({ text: "Saved", kind: "ok" });
+      await saveRef.current(sent);
+      for (const s of sent) {
+        const key = s.model + SEP + s.item_id;
+        const c = local.current?.[s.model]?.[s.item_id];
+        const unchanged = c && c.cost === s.cost && c.suggested_retail === s.suggested_retail && c.retail === s.retail;
+        if (unchanged && !pending.current.has(key)) dirty.current.delete(key);
+      }
     } catch (e: any) {
-      setStatus({ text: e?.message || "Save failed — edit again to retry.", kind: "err" });
-      for (const c of changes) pending.current.set(c.model + "|" + c.item_id, c);
+      failed = true;
+      for (const k of keys) pending.current.add(k);
+      setStatus(e?.message || "Save failed — edit again or tap away to retry.", "err");
+    } finally {
+      saving.current = false;
     }
-  }
+    if (failed) return;
+    if (pending.current.size) {
+      setStatus("Unsaved changes…", "");
+      timer.current = setTimeout(flush, 400); // edits made while that save was in flight
+    } else setStatus("Saved", "ok");
+  }, [setStatus]);
+
+  const edit = useCallback(
+    (cellKey: string, field: Field, v: number | null) => {
+      const [m, k] = cellKey.split(SEP);
+      const all = local.current || {};
+      const cur = all[m]?.[k] || EMPTY;
+      local.current = { ...all, [m]: { ...all[m], [k]: { ...cur, [field]: v } } };
+      pending.current.add(cellKey);
+      dirty.current.add(cellKey);
+      setStatus("Unsaved changes…", "");
+      clearTimeout(timer.current);
+      timer.current = setTimeout(flush, 900);
+    },
+    [flush, setStatus]
+  );
+
+  // Leaving a box saves right away; so does switching apps / closing the tab.
+  const done = useCallback(() => {
+    if (pending.current.size) flush();
+  }, [flush]);
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && done();
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      done();
+    };
+  }, [done]);
 
   const services = useMemo(
     () => book.services.map((s) => ({ ...s, items: s.items.filter((i) => showInactive || i.active) })),
@@ -192,8 +350,9 @@ export default function PriceGrid({
                   <tr key={model}>
                     <td className="model">{model}</td>
                     {svc.items.map((it) => {
-                      const c = local[model]?.[it.id] || { cost: null, suggested_retail: null, retail: null };
+                      const c = local.current?.[model]?.[it.id] || EMPTY;
                       const id = `${model}-${it.id}`.replace(/\W+/g, "_");
+                      const ck = model + SEP + it.id;
                       return (
                         <td key={it.id} className={"col" + ((mobilePkg[svc.id] ?? svc.items[0]?.id) === it.id ? " sel" : "")}>
                           <div className="pair">
@@ -201,11 +360,11 @@ export default function PriceGrid({
                               <>
                                 <label className="cost">
                                   <span className="cur">$</span>
-                                  <input id={id + "-c"} inputMode="numeric" placeholder="—" value={fmt(c.cost)} onChange={(e) => queue(model, it.id, "cost", parse(e.target.value))} />
+                                  <PriceInput id={id + "-c"} value={c.cost} placeholder="—" cellKey={ck} field="cost" edit={edit} done={done} />
                                 </label>
                                 <label className="sugg">
                                   <span className="cur">$</span>
-                                  <input id={id + "-s"} inputMode="numeric" placeholder="—" value={fmt(c.suggested_retail)} onChange={(e) => queue(model, it.id, "suggested_retail", parse(e.target.value))} />
+                                  <PriceInput id={id + "-s"} value={c.suggested_retail} placeholder="—" cellKey={ck} field="suggested_retail" edit={edit} done={done} />
                                 </label>
                               </>
                             ) : (
@@ -222,7 +381,7 @@ export default function PriceGrid({
                                 </label>
                                 <label className="cost">
                                   <span className="cur">$</span>
-                                  <input id={id + "-r"} inputMode="numeric" placeholder={fmt(c.suggested_retail) || "—"} value={fmt(c.retail)} onChange={(e) => queue(model, it.id, "retail", parse(e.target.value))} />
+                                  <PriceInput id={id + "-r"} value={c.retail} placeholder={fmt(c.suggested_retail) || "—"} cellKey={ck} field="retail" edit={edit} done={done} />
                                 </label>
                               </>
                             )}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { cleanChange, slugify } from "@/lib/caret";
+import { useEffect, useRef, useState } from "react";
 import WgaHeader from "@/components/WgaHeader";
 import { hasPerm } from "@/lib/perms";
 import { useWgaSession } from "@/lib/useDealerSession";
@@ -92,7 +93,7 @@ export default function WgaDealershipsPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
                   <div>
                     <h3 style={{ marginBottom: 2 }}>{d.name}{d.active ? null : <span className="status-pill cancelled" style={{ marginLeft: 10, verticalAlign: "middle" }}>Inactive — logins blocked</span>}</h3>
-                    <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{d.location} · {d.brand} · slug <b style={{ color: "var(--text-2)" }}>{d.slug}</b> · net {d.billing_terms}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{d.location} · {d.brand} · slug <b style={{ color: "var(--text-2)" }}>{d.slug}</b></div>
                     <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>Portal: {(d.hostnames || []).length ? (d.hostnames || []).map((h) => <a key={h} href={`https://${h}`} target="_blank" rel="noreferrer" style={{ color: "var(--gold)", marginRight: 10 }}>{h}</a>) : <span>no hostname yet</span>}
                       <button className="link-btn" onClick={() => { const v = prompt("Hostnames for this dealership (comma separated):", (d.hostnames || []).join(", ")); if (v !== null) act({ action: "dealership.update", id: d.id, hostnames: v }).catch((er) => setMsg(er.message)); }}>edit</button>
                     </div>
@@ -106,6 +107,7 @@ export default function WgaDealershipsPage() {
                 </div>
                 <div style={{ display: "flex", gap: 24, flexWrap: "wrap", margin: "16px 0" }}>
                   <label className="check"><input type="checkbox" checked={d.active} onChange={(e) => { if (!e.target.checked && !confirm(`Deactivate ${d.name}? Every one of their logins stops working immediately and their portal link goes dark until you turn it back on.`)) { e.preventDefault(); return; } act({ action: "dealership.update", id: d.id, active: e.target.checked }).catch((er) => setMsg(er.message)); }} /> Active</label>
+                  <TermsField value={d.billing_terms} onSave={(n) => act({ action: "dealership.update", id: d.id, billing_terms: n })} />
                   <label className="check"><input type="checkbox" checked={d.hide_cost_from_users} onChange={(e) => act({ action: "dealership.update", id: d.id, hide_cost_from_users: e.target.checked }).catch((er) => setMsg(er.message))} /> Hide WGA cost from their sales users</label>
                 </div>
                 {/* Phones: one card per login */}
@@ -242,6 +244,53 @@ function AccountModal({ modal, onClose, act }: { modal: any; onClose: () => void
   );
 }
 
+// Net payment terms for one dealership — type the days, it saves when you leave the box (or hit Enter).
+function TermsField({ value, onSave }: { value: number; onSave: (n: number) => Promise<void> }) {
+  const [text, setText] = useState(String(value ?? 30));
+  const [state, setState] = useState<"" | "saving" | "saved" | "err">("");
+  const [err, setErr] = useState("");
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(String(value ?? 30));
+  }, [value]);
+  async function commit() {
+    focused.current = false;
+    const n = Number(text);
+    if (!text || !Number.isInteger(n) || n < 0 || n > 180) {
+      setErr("0–180 days");
+      setState("err");
+      setText(String(value ?? 30));
+      return;
+    }
+    if (n === value) return;
+    setState("saving");
+    try {
+      await onSave(n);
+      setState("saved");
+      setTimeout(() => setState((s) => (s === "saved" ? "" : s)), 2000);
+    } catch (e: any) {
+      setErr(e?.message || "Could not save");
+      setState("err");
+    }
+  }
+  return (
+    <label className="terms-field" title="Payment terms on this dealership's monthly statement">
+      <span>Payment terms · Net</span>
+      <input
+        inputMode="numeric"
+        aria-label="Net terms in days"
+        value={text}
+        onFocus={(e) => { focused.current = true; setErr(""); setState(""); const el = e.target; setTimeout(() => document.activeElement === el && el.select(), 0); }}
+        onChange={(e) => cleanChange(e, (x) => x.replace(/\D/g, "").slice(0, 3), setText)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      />
+      <span>days</span>
+      <span className={"terms-state " + state}>{state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state === "err" ? err : ""}</span>
+    </label>
+  );
+}
+
 const inputStyle = { width: "100%", background: "var(--bg)", border: "1px solid var(--stroke)", color: "var(--text)", padding: "10px 12px", fontFamily: "inherit", fontSize: 13 } as const;
 
 function NewDealershipModal({ onClose, act, brands, dealerships }: { onClose: () => void; act: (b: any) => Promise<void>; brands: BrandRow[]; dealerships: DealershipRow[] }) {
@@ -249,13 +298,14 @@ function NewDealershipModal({ onClose, act, brands, dealerships }: { onClose: ()
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: any) => setF((x: any) => ({ ...x, [k]: v }));
+  const [slugTouched, setSlugTouched] = useState(false);
   const siblings = dealerships.filter((d) => d.brand_key === f.brand_key);
   async function go(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr("");
     try {
-      await act({ action: "dealership.create", ...f });
+      await act({ action: "dealership.create", ...f, billing_terms: Number(f.billing_terms) || 30 });
       onClose();
     } catch (er: any) {
       setErr(er.message);
@@ -267,13 +317,13 @@ function NewDealershipModal({ onClose, act, brands, dealerships }: { onClose: ()
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={go} style={{ maxWidth: 560 }}>
         <h3>Add dealership</h3>
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
-          <div className="field" style={{ gridColumn: "1 / -1" }}><label>Dealership name</label><input value={f.name} onChange={(e) => { set("name", e.target.value); if (!f.slug) set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-")); }} required placeholder="BMW of Tulsa" /></div>
-          <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => set("slug", e.target.value)} required placeholder="bmw-tulsa" /></div>
+          <div className="field" style={{ gridColumn: "1 / -1" }}><label>Dealership name</label><input value={f.name} onChange={(e) => { const v = e.target.value; set("name", v); if (!slugTouched) set("slug", slugify(v)); }} required placeholder="BMW of Tulsa" /></div>
+          <div className="field"><label>Slug</label><input value={f.slug} onChange={(e) => { setSlugTouched(true); set("slug", e.target.value); }} required placeholder="bmw-tulsa" autoCapitalize="none" autoCorrect="off" spellCheck={false} /></div>
           <div className="field"><label>Short name</label><input value={f.short_name} onChange={(e) => set("short_name", e.target.value)} placeholder="BMW Tulsa" /></div>
           <div className="field"><label>Brand</label><select value={f.brand_key} onChange={(e) => set("brand_key", e.target.value)} required>{brands.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}</select></div>
           <div className="field"><label>Location</label><input value={f.location} onChange={(e) => set("location", e.target.value)} placeholder="Tulsa, Oklahoma" /></div>
           <div className="field" style={{ gridColumn: "1 / -1" }}><label>Portal hostname(s)</label><input value={f.hostnames} onChange={(e) => set("hostnames", e.target.value)} placeholder="bmw.whitegloveauto.app" /><p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6 }}>Add the same subdomain in Netlify (Domain management → add domain alias). DNS for *.whitegloveauto.app should already point at Netlify.</p></div>
-          <div className="field"><label>Billing terms (net days)</label><input type="number" value={f.billing_terms} onChange={(e) => set("billing_terms", Number(e.target.value))} /></div>
+          <div className="field"><label>Billing terms (net days)</label><input inputMode="numeric" value={f.billing_terms} onChange={(e) => cleanChange(e, (x) => x.replace(/\D/g, "").slice(0, 3), (v) => set("billing_terms", v))} placeholder="30" /></div>
           <div className="field"><label>Copy pricing from</label><select value={f.copy_pricing_from} onChange={(e) => set("copy_pricing_from", e.target.value)}><option value="">Start empty</option>{siblings.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
           <div style={{ gridColumn: "1 / -1", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-3)", marginTop: 6 }}>First dealer admin login (optional)</div>
           <div className="field"><label>Name</label><input value={f.admin_name} onChange={(e) => set("admin_name", e.target.value)} /></div>
@@ -298,6 +348,8 @@ function BrandModal({ onClose, brand, brands, reload }: { onClose: () => void; b
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: any) => setF((x: any) => ({ ...x, [k]: v }));
   const setT = (k: string, v: string) => setF((x: any) => ({ ...x, theme: { ...x.theme, [k]: v } }));
+  const [keyTouched, setKeyTouched] = useState(!!brand);
+  const [makeTouched, setMakeTouched] = useState(!!brand?.make);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -325,9 +377,9 @@ function BrandModal({ onClose, brand, brands, reload }: { onClose: () => void; b
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={save} style={{ maxWidth: 620 }}>
         <h3>{brand ? `Brand · ${brand.name}` : "Add brand"}</h3>
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
-          <div className="field"><label>Name (as shown)</label><input value={f.name} onChange={(e) => { set("name", e.target.value); if (!brand) set("key", e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-")); if (!f.make) set("make", e.target.value); }} required placeholder="BMW" /></div>
-          <div className="field"><label>Key</label><input value={f.key} onChange={(e) => set("key", e.target.value)} required disabled={!!brand} placeholder="bmw" /></div>
-          <div className="field"><label>Make (on vehicles / ShopMonkey)</label><input value={f.make} onChange={(e) => set("make", e.target.value)} placeholder="BMW" /></div>
+          <div className="field"><label>Name (as shown)</label><input value={f.name} onChange={(e) => { const v = e.target.value; set("name", v); if (!keyTouched) set("key", slugify(v)); if (!makeTouched) set("make", v); }} required placeholder="BMW" /></div>
+          <div className="field"><label>Key</label><input value={f.key} onChange={(e) => { setKeyTouched(true); set("key", e.target.value); }} required disabled={!!brand} placeholder="bmw" autoCapitalize="none" autoCorrect="off" spellCheck={false} /></div>
+          <div className="field"><label>Make (on vehicles / ShopMonkey)</label><input value={f.make} onChange={(e) => { setMakeTouched(true); set("make", e.target.value); }} placeholder="BMW" /></div>
           <div className="field"><label>Tagline</label><input value={f.tagline} onChange={(e) => set("tagline", e.target.value)} placeholder="Authorized dealership pricing portal" /></div>
           {!brand ? <div className="field" style={{ gridColumn: "1 / -1" }}><label>Copy services &amp; packages from</label><select value={f.copy_catalog_from} onChange={(e) => set("copy_catalog_from", e.target.value)}><option value="">Start empty</option>{brands.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}</select></div> : null}
           {brand ? (

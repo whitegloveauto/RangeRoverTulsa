@@ -169,8 +169,8 @@ export default function WgaVehiclesPage() {
                 if (d) setNewModel({ model: "", trim: "" });
               }}
             >
-              <div className="field"><label>Model</label><input value={newModel.model} onChange={(e) => setNewModel({ ...newModel, model: e.target.value })} placeholder="e.g. Range Rover Electric" required /></div>
-              <div className="field"><label>First trim</label><input value={newModel.trim} onChange={(e) => setNewModel({ ...newModel, trim: e.target.value })} placeholder="e.g. SE" required /></div>
+              <div className="field"><label>Model</label><input value={newModel.model} onChange={(e) => { const v = e.target.value; setNewModel((p) => ({ ...p, model: v })); }} placeholder="e.g. Range Rover Electric" required /></div>
+              <div className="field"><label>First trim</label><input value={newModel.trim} onChange={(e) => { const v = e.target.value; setNewModel((p) => ({ ...p, trim: v })); }} placeholder="e.g. SE" required /></div>
               <button className="btn-primary btn-sm" disabled={busy || !year}>Add model</button>
             </form>
             <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10 }}>A new model shows up as a new row on the Pricing grid — price it there before dealers can order it.</p>

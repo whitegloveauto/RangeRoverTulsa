@@ -37,7 +37,7 @@ export async function GET(
   return NextResponse.json({
     quote: data,
     events: events || [],
-    brand: tenant ? { name: tenant.brand.name, logo_url: tenant.brand.logo_url } : null,
+    brand: tenant ? { name: tenant.brand.name, logo_url: tenant.brand.logo_paper_url || tenant.brand.logo_url } : null,
     dealership: {
       name: session.name,
       brand: session.brand,

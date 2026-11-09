@@ -34,7 +34,7 @@ export default function MasterPage() {
         <button className="btn-primary btn-sm" onClick={() => window.print()}>Print / Save PDF</button>
       </div>
       <main style={{ padding: "40px 20px" }}>
-        <MasterSheet book={book} dealership={session.dealership.name} logo={session.brand?.logo_url} brandName={session.brand?.name} showCost={showCost && book.canSeeCost} showSuggested={showSuggested} />
+        <MasterSheet book={book} dealership={session.dealership.name} logo={session.brand?.logo_paper_url || session.brand?.logo_url} brandName={session.brand?.name} showCost={showCost && book.canSeeCost} showSuggested={showSuggested} />
       </main>
     </div>
   );

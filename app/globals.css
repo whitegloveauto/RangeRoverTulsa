@@ -670,3 +670,11 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
 
 /* VINs: monospace so they read character-by-character */
 .vin { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.04em; font-size: 0.95em; white-space: nowrap; }
+
+/* per-dealership net terms (WGA Dealerships) */
+.terms-field { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.terms-field input { width: 64px; text-align: center; background: var(--bg); border: 1px solid var(--stroke); color: var(--text); font-family: inherit; font-size: 14px; padding: 7px 8px; border-radius: 1px; outline: none; font-feature-settings: "tnum"; }
+.terms-field input:focus { border-color: var(--gold); }
+.terms-state { font-size: 11px; min-width: 60px; color: var(--text-3); }
+.terms-state.saved { color: var(--gold-bright); }
+.terms-state.err { color: var(--warn); }

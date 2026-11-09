@@ -63,7 +63,7 @@ export async function loadPacket(where: { id?: string; token?: string; dealershi
     zones,
     imageUrl: img?.image_url || null,
     preparedBy: qr.dealer_user_name || null,
-    brand: { name: tenant?.brand.name || brand, make: tenant?.brand.make || brand, logo_url: tenant?.brand.logo_url || "/landrover.png" },
+    brand: { name: tenant?.brand.name || brand, make: tenant?.brand.make || brand, logo_url: tenant?.brand.logo_paper_url || tenant?.brand.logo_url || "/brands/land-rover-color.png" },
   };
 }
 

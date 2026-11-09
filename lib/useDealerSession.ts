@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export interface DealerSessionInfo {
   dealership: { name: string; brand: string; location: string | null; short_name?: string };
-  brand?: { key: string; name: string; make: string; logo_url: string; tagline: string | null } | null;
+  brand?: { key: string; name: string; make: string; logo_url: string; logo_paper_url?: string; tagline: string | null } | null;
   user: { name: string; email: string; role: "admin" | "user"; canSeeCost: boolean };
 }
 

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { DEFAULT_THEME, type BrandTheme } from "@/lib/theme";
+import { brandLogos } from "@/lib/brandLogo";
 export { DEFAULT_THEME, WGA_THEME, themeCss, fontHref, type BrandTheme } from "@/lib/theme";
 
 // Multi-dealer tenancy. A dealership is resolved from the request hostname
@@ -9,7 +10,7 @@ export { DEFAULT_THEME, WGA_THEME, themeCss, fontHref, type BrandTheme } from "@
 
 export interface Tenant {
   dealership: { id: string; slug: string; name: string; short_name: string; brand: string; brand_key: string; location: string | null; hide_cost_from_users: boolean };
-  brand: { key: string; name: string; make: string; logo_url: string; tagline: string | null };
+  brand: { key: string; name: string; make: string; logo_url: string; logo_paper_url: string; tagline: string | null };
   theme: BrandTheme;
 }
 
@@ -19,7 +20,11 @@ function build(d: any, b: any): Tenant {
   const theme: BrandTheme = { ...DEFAULT_THEME, ...((b?.theme as Partial<BrandTheme>) || {}), ...((d?.theme_override as Partial<BrandTheme>) || {}) };
   return {
     dealership: { id: d.id, slug: d.slug, name: d.name, short_name: d.short_name || d.name, brand: d.brand, brand_key: d.brand_key || "land-rover", location: d.location, hide_cost_from_users: !!d.hide_cost_from_users },
-    brand: { key: b?.key || d.brand_key || "land-rover", name: b?.name || d.brand, make: b?.make || d.brand, logo_url: d.logo_url || b?.logo_light_url || "/landrover.png", tagline: b?.tagline || null },
+    brand: (() => {
+      const key = b?.key || d.brand_key || "land-rover";
+      const logos = brandLogos({ key, make: b?.make || d.brand, name: b?.name || d.brand, logo_light_url: b?.logo_light_url }, d.logo_url);
+      return { key, name: b?.name || d.brand, make: b?.make || d.brand, logo_url: logos.screen, logo_paper_url: logos.paper, tagline: b?.tagline || null };
+    })(),
     theme,
   };
 }

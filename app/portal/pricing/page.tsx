@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import { getSelectedVehicle } from "@/lib/vehicleStore";
 import { useDealerSession } from "@/lib/useDealerSession";
 import type { PricingBook } from "@/lib/types";
+import { cleanChange, cleanVin } from "@/lib/caret";
 
 const money = (n: number | null | undefined) => (n === null || n === undefined ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }));
 
@@ -208,8 +209,8 @@ export default function PricingPage() {
             <div className="db-fields">
               <div className="field" style={{ gridColumn: "1 / -1" }}>
                 <label htmlFor="vin">VIN {vin ? <span style={{ color: vinOk ? "var(--gold)" : "var(--text-3)", letterSpacing: 0, textTransform: "none" }}>· {vinOk ? "✓" : `${vin.length}/17`}</span> : null}</label>
-                <input id="vin" value={vin} maxLength={17} autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }}
-                  onChange={(e) => setVin(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 17))} placeholder="17 characters — required to submit" />
+                <input id="vin" value={vin} autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.08em" }}
+                  onChange={(e) => cleanChange(e, cleanVin, setVin)} placeholder="17 characters — required to submit" />
               </div>
               <div className="field"><label htmlFor="avail">Vehicle available from</label><input id="avail" type="date" value={availableFrom} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setAvailableFrom(e.target.value)} /></div>
               <div className="field"><label htmlFor="needed">Needed back by</label><input id="needed" type="date" value={neededBy} min={availableFrom || new Date().toISOString().slice(0, 10)} onChange={(e) => setNeededBy(e.target.value)} /></div>
