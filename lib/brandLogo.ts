@@ -32,11 +32,14 @@ export function shippedLogoKey(...candidates: (string | null | undefined)[]): st
 const isPlaceholder = (u?: string | null) => !u || /\/wga-(white|black)\.png$/.test(u);
 
 // { screen: for dark UI, paper: for white documents }
-export function brandLogos(b: { key?: string | null; make?: string | null; name?: string | null; logo_light_url?: string | null } | null | undefined, dealershipLogo?: string | null) {
+// wgaFallback: false on the dealership side — they never show White Glove Auto's logo (empty instead).
+export function brandLogos(b: { key?: string | null; make?: string | null; name?: string | null; logo_light_url?: string | null } | null | undefined, dealershipLogo?: string | null, opts: { wgaFallback?: boolean } = {}) {
+  const fb = opts.wgaFallback !== false;
   const k = shippedLogoKey(b?.key, b?.make, b?.name);
   const uploaded = !isPlaceholder(dealershipLogo) ? dealershipLogo! : !isPlaceholder(b?.logo_light_url) ? b!.logo_light_url! : null;
   return {
-    screen: uploaded || (k ? `/brands/${k}.png` : "/wga-white.png"),
-    paper: k ? `/brands/${k}-color.png` : uploaded || "/wga-black.png",
+    screen: uploaded || (k ? `/brands/${k}.png` : fb ? "/wga-white.png" : ""),
+    paper: k ? `/brands/${k}-color.png` : uploaded || (fb ? "/wga-black.png" : ""),
+    key: k,
   };
 }

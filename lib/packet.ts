@@ -1,8 +1,9 @@
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { tenantByDealershipId } from "@/lib/tenant";
+import { lineCoverage } from "@/lib/coverage";
 
-// Everything the customer packet needs, assembled server-side.
+// Everything the quote document needs (components/QuoteDocument), assembled server-side.
 export interface PacketData {
   quote: {
     id: string;
@@ -10,6 +11,7 @@ export interface PacketData {
     vehicle_year: number;
     vehicle_model: string;
     vehicle_trim: string;
+    vehicle_vin: string | null;
     stock_number: string | null;
     customer_name: string | null;
     retail_total: number;
@@ -17,9 +19,8 @@ export interface PacketData {
     submitted_at: string | null;
   };
   dealership: { id: string; name: string; location: string | null };
-  lines: { item_id: string; service: string; name: string; retail: number; description: string | null; zones: string[]; blurb: string | null }[];
+  lines: { item_id: string; service: string; name: string; retail: number; description: string | null; coverage: string | null; blurb: string | null }[];
   services: { id: string; name: string; product_name: string | null; blurb: string | null; facts: string[] }[];
-  zones: string[];
   imageUrl: string | null;
   preparedBy: string | null;
   brand: { name: string; make: string; logo_url: string };
@@ -28,7 +29,7 @@ export interface PacketData {
 export async function loadPacket(where: { id?: string; token?: string; dealershipId?: string }): Promise<PacketData | null> {
   let q = supabaseAdmin
     .from("dealer_quotes")
-    .select("id, quote_number, vehicle_year, vehicle_model, vehicle_trim, stock_number, customer_name, retail_total, created_at, submitted_at, line_items, dealer_user_name, dealership_id, dealer_dealerships(name, location, brand)");
+    .select("id, quote_number, vehicle_year, vehicle_model, vehicle_trim, vehicle_vin, stock_number, customer_name, retail_total, created_at, submitted_at, line_items, dealer_user_name, dealership_id, dealer_dealerships(name, location, brand)");
   if (where.token) q = q.eq("packet_token", where.token);
   else if (where.id) q = q.eq("id", where.id);
   else return null;
@@ -41,29 +42,28 @@ export async function loadPacket(where: { id?: string; token?: string; dealershi
   const itemIds = lineItems.map((l) => l.item_id).filter(Boolean);
 
   const tenant = await tenantByDealershipId(qr.dealership_id).catch(() => null);
-  const [{ data: items }, { data: services }, { data: img }] = await Promise.all([
-    itemIds.length ? supabaseAdmin.from("dealer_service_items").select("id, service_id, description, zones, blurb").in("id", itemIds) : Promise.resolve({ data: [] as any[] }),
+  const [{ data: items }, { data: services }, { data: img }, coverage] = await Promise.all([
+    itemIds.length ? supabaseAdmin.from("dealer_service_items").select("id, description, blurb").in("id", itemIds) : Promise.resolve({ data: [] as any[] }),
     supabaseAdmin.from("dealer_services").select("id, name, product_name, blurb, facts, sort_order").eq("brand", brand).order("sort_order"),
     supabaseAdmin.from("dealer_model_images").select("image_url").eq("brand", brand).eq("model", qr.vehicle_model).maybeSingle(),
+    lineCoverage(brand, lineItems),
   ]);
   const byId = new Map((items || []).map((i: any) => [i.id, i]));
   const lines = lineItems.map((l) => {
-    const it = byId.get(l.item_id) || {};
-    return { item_id: l.item_id, service: l.service, name: l.name, retail: Number(l.retail ?? 0), description: it.description ?? null, zones: it.zones ?? [], blurb: it.blurb ?? null };
+    const it: any = byId.get(l.item_id) || {};
+    return { item_id: l.item_id, service: l.service, name: l.name, retail: Number(l.retail ?? 0), description: it.description ?? null, coverage: coverage[l.item_id] || null, blurb: it.blurb ?? null };
   });
   const usedServiceNames = new Set(lines.map((l) => l.service));
   const svc = (services || []).filter((s: any) => usedServiceNames.has(s.name)).map((s: any) => ({ id: s.id, name: s.name, product_name: s.product_name, blurb: s.blurb, facts: s.facts || [] }));
-  const zones = Array.from(new Set(lines.flatMap((l) => l.zones)));
 
   return {
-    quote: { id: qr.id, quote_number: qr.quote_number, vehicle_year: qr.vehicle_year, vehicle_model: qr.vehicle_model, vehicle_trim: qr.vehicle_trim, stock_number: qr.stock_number, customer_name: qr.customer_name, retail_total: Number(qr.retail_total ?? 0), created_at: qr.created_at, submitted_at: qr.submitted_at },
+    quote: { id: qr.id, quote_number: qr.quote_number, vehicle_year: qr.vehicle_year, vehicle_model: qr.vehicle_model, vehicle_trim: qr.vehicle_trim, vehicle_vin: qr.vehicle_vin || null, stock_number: qr.stock_number, customer_name: qr.customer_name, retail_total: Number(qr.retail_total ?? 0), created_at: qr.created_at, submitted_at: qr.submitted_at },
     dealership: { id: qr.dealership_id, name: d?.name || "Dealership", location: d?.location || null },
     lines,
     services: svc,
-    zones,
     imageUrl: img?.image_url || null,
     preparedBy: qr.dealer_user_name || null,
-    brand: { name: tenant?.brand.name || brand, make: tenant?.brand.make || brand, logo_url: tenant?.brand.logo_paper_url || tenant?.brand.logo_url || "/brands/land-rover-color.png" },
+    brand: { name: tenant?.brand.name || brand, make: tenant?.brand.make || brand, logo_url: tenant?.brand.logo_paper_url || tenant?.brand.logo_url || "" },
   };
 }
 

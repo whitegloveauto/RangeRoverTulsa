@@ -48,14 +48,15 @@ function Letterhead({ dealership, right, logo, brandName }: { dealership: string
   return (
     <div className="sheet-letterhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${paper.ink}`, paddingBottom: 18, marginBottom: 24 }}>
       <div className="sheet-logos" style={{ display: "flex", alignItems: "center", gap: 22 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo || "/landrover.png"} alt={brandName || "Dealership"} style={{ height: 44, width: "auto", maxWidth: 150, objectFit: "contain", display: "block" }} />
-        <div style={{ width: 1, height: 36, background: paper.rule }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto", display: "block" }} />
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt={brandName || "Dealership"} style={{ height: 44, width: "auto", maxWidth: 150, objectFit: "contain", display: "block" }} />
+        ) : (
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: paper.ink }}>{brandName || dealership}</div>
+        )}
       </div>
       <div className="sheet-prepared" style={{ textAlign: "right" }}>
-        <div style={{ fontSize: 9, letterSpacing: "0.22em", color: paper.gold, textTransform: "uppercase" }}>Prepared for</div>
+        <div style={{ fontSize: 9, letterSpacing: "0.22em", color: paper.gold, textTransform: "uppercase" }}>Protection pricing</div>
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: paper.ink, marginTop: 2 }}>{dealership}</div>
         {right}
       </div>
@@ -68,7 +69,7 @@ function Footer() {
     <div style={{ marginTop: 32, paddingTop: 14, borderTop: `1px solid ${paper.rule}`, fontSize: 9.5, color: "#999", textAlign: "center", letterSpacing: "0.05em", lineHeight: 1.7 }}>
       Paint protection film: XPEL Ultimate Plus with manufacturer warranty · Ceramic coating: XPEL Fusion Plus · Window film: XPEL Prime
       <br />
-      Installed by White Glove Auto · Tulsa, Oklahoma · Pricing subject to change; confirm at time of order.
+      Professionally installed · Pricing subject to change; confirm at time of order.
     </div>
   );
 }
@@ -129,7 +130,7 @@ export function VehicleSheet({
                   <tr key={it.id} style={{ borderBottom: `1px solid ${paper.tint}` }}>
                     <td style={{ padding: "7px 0", color: "#333" }}>
                       {it.name}
-                      {it.description ? <div style={{ fontSize: 10.5, color: paper.muted }}>{it.description}</div> : null}
+                      {it.coverage || it.description ? <div style={{ fontSize: 10.5, color: paper.muted, lineHeight: 1.45 }}>{it.coverage || it.description}</div> : null}
                     </td>
                     {showCost ? <td style={{ textAlign: "right", color: paper.muted, fontVariantNumeric: "tabular-nums" }}>{money(c?.cost)}</td> : null}
                     {showSuggested ? <td style={{ textAlign: "right", color: paper.muted, fontVariantNumeric: "tabular-nums" }}>{money(c?.suggested_retail)}</td> : null}

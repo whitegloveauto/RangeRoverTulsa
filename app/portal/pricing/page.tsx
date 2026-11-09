@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
-import { getSelectedVehicle } from "@/lib/vehicleStore";
+import { getSelectedVehicle, setSelectedVehicle } from "@/lib/vehicleStore";
 import { useDealerSession } from "@/lib/useDealerSession";
 import type { PricingBook } from "@/lib/types";
 import { cleanChange, cleanVin } from "@/lib/caret";
@@ -24,8 +24,35 @@ export default function PricingPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; err?: boolean }>({ text: "" });
   const [dup, setDup] = useState<any>(null);
+  // Editing a saved quote (/portal/pricing?quote=<id>): load it back in; Save/Submit update that quote.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editNumber, setEditNumber] = useState("");
+  const [pendingItems, setPendingItems] = useState<string[] | null>(null);
 
   useEffect(() => {
+    const qid = new URLSearchParams(window.location.search).get("quote");
+    if (qid) {
+      (async () => {
+        const r = await fetch(`/api/quotes/${qid}`);
+        const d = r.ok ? await r.json() : null;
+        const q = d?.quote;
+        if (!q || q.status !== "draft") {
+          router.replace(q ? `/portal/quote/${qid}` : "/portal/orders");
+          return;
+        }
+        const v = { year: Number(q.vehicle_year), model: q.vehicle_model, trim: q.vehicle_trim };
+        setSelectedVehicle(v);
+        setVehicle(v);
+        setEditId(qid);
+        setEditNumber(q.quote_number || "");
+        setVin(q.vehicle_vin || "");
+        setNotes(q.notes || "");
+        setAvailableFrom(q.available_from || "");
+        setNeededBy(q.needed_by || "");
+        setPendingItems((Array.isArray(q.line_items) ? q.line_items : []).map((l: any) => l.item_id).filter(Boolean));
+      })();
+      return;
+    }
     const v = getSelectedVehicle();
     if (!v) {
       router.replace("/portal/vehicle");
@@ -33,6 +60,26 @@ export default function PricingPage() {
     }
     setVehicle(v);
   }, [router]);
+
+  // Once the book is loaded, put the saved quote's choices back — one per category.
+  useEffect(() => {
+    if (!book || !pendingItems) return;
+    const keep = new Set<string>();
+    const doubled: string[] = [];
+    const used = new Set<string>(); // pick-one groups already filled
+    for (const svc of book.services) {
+      const g = svc.group ? `g:${svc.group}` : `s:${svc.id}`;
+      const picked = svc.items.filter((it) => pendingItems.includes(it.id));
+      if (picked[0] && !used.has(g)) {
+        keep.add(picked[0].id);
+        used.add(g);
+        if (picked.length > 1) doubled.push(svc.group || svc.name);
+      } else if (picked[0]) doubled.push(svc.group || svc.name);
+    }
+    setSelected(keep);
+    setPendingItems(null);
+    if (doubled.length) setMsg({ text: `This quote had more than one option under ${Array.from(new Set(doubled)).join(" and ")}. Only one is allowed — check the one you want.`, err: true });
+  }, [book, pendingItems]);
 
   useEffect(() => {
     if (!ready) return;
@@ -55,12 +102,22 @@ export default function PricingPage() {
     return { retail, cost, count };
   }, [selected, prices]);
 
+  // One option per category: picking one replaces whatever else was picked in that category;
+  // tapping the picked one again clears the category.
   function toggle(id: string) {
     const c = prices[id];
-    if (!c || c.retail === null) return;
+    if (!c || c.retail === null || !book) return;
+    const svc = book.services.find((s) => s.items.some((i) => i.id === id));
+    // services in the same pick-one group (e.g. PPF Clear + Stealth) share the one choice
+    const linked = svc?.group ? book.services.filter((s) => s.group === svc.group) : svc ? [svc] : [];
     setSelected((cur) => {
       const n = new Set(cur);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) {
+        n.delete(id);
+        return n;
+      }
+      for (const s of linked) for (const it of s.items) n.delete(it.id);
+      n.add(id);
       return n;
     });
   }
@@ -92,6 +149,7 @@ export default function PricingPage() {
         itemIds: Array.from(selected),
         submit,
         confirmDuplicate,
+        ...(editId ? { quoteId: editId } : {}),
       }),
     });
     const data = await res.json();
@@ -101,6 +159,10 @@ export default function PricingPage() {
       return;
     }
     if (!res.ok) {
+      if (data.alreadySubmitted && editId) {
+        router.replace(`/portal/quote/${editId}`);
+        return;
+      }
       setMsg({ text: data.error || "Could not save.", err: true });
       return;
     }
@@ -124,6 +186,12 @@ export default function PricingPage() {
     );
   }
 
+  // "Pick one", or for linked services "Pick one — Clear or Stealth"
+  const pickOneNote = (svc: PricingBook["services"][number]) => {
+    const others = svc.group ? book.services.filter((x) => x.group === svc.group && x.id !== svc.id && x.items.length) : [];
+    return others.length ? `Pick one · or ${others.map((x) => x.name).join(" / ")}, not both` : "Pick one";
+  };
+
   const sheetHref = `/portal/sheet?model=${encodeURIComponent(vehicle.model)}&year=${vehicle.year}&trim=${encodeURIComponent(vehicle.trim)}`;
 
   return (
@@ -139,7 +207,7 @@ export default function PricingPage() {
         <div className="stage">
           <div className="nameplate" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
             <div>
-              <div className="meta">{session.dealership.brand.toUpperCase()} · {vehicle.year}</div>
+              <div className="meta">{session.dealership.brand.toUpperCase()} · {vehicle.year}{editId ? ` · EDITING QUOTE ${editNumber}` : ""}</div>
               <div className="year-model">{vehicle.model}</div>
               <div className="trim">{vehicle.trim}</div>
             </div>
@@ -147,15 +215,19 @@ export default function PricingPage() {
               <Link href={sheetHref} className="btn-ghost btn-sm" style={{ display: "inline-block" }}>
                 Print price sheet
               </Link>
-              <button className="reset" onClick={() => router.push("/portal/vehicle")}>CHANGE VEHICLE</button>
+              {editId ? (
+                <button className="reset" onClick={() => router.push(`/portal/quote/${editId}`)}>BACK TO QUOTE</button>
+              ) : (
+                <button className="reset" onClick={() => router.push("/portal/vehicle")}>CHANGE VEHICLE</button>
+              )}
             </div>
           </div>
 
           {book.services.map((svc) => (
-            <div key={svc.id} className="svc-block">
+            <div key={svc.id} className="svc-block" role="radiogroup" aria-label={svc.name}>
               <div className="svc-head">
                 <div className="svc-title">{svc.name}</div>
-                {svc.note ? <div className="svc-note">{svc.note}</div> : null}
+                <div className="svc-note">{svc.note ? `${svc.note} · ` : ""}{pickOneNote(svc)}</div>
               </div>
               {svc.items.length === 0 ? <div style={{ padding: "14px 24px", fontSize: 12, color: "var(--text-3)" }}>No packages yet.</div> : null}
               {svc.items.map((it) => {
@@ -163,11 +235,12 @@ export default function PricingPage() {
                 const unpriced = !c || c.retail === null;
                 const on = selected.has(it.id);
                 return (
-                  <div key={it.id} className={"svc-item" + (on ? " selected" : "") + (unpriced ? " unpriced" : "")} onClick={() => toggle(it.id)} role="checkbox" aria-checked={on}>
-                    <div className={"ac-check"} style={on ? { borderColor: "var(--gold)", background: "var(--gold)" } : undefined} />
+                  <div key={it.id} className={"svc-item" + (on ? " selected" : "") + (unpriced ? " unpriced" : "")} onClick={() => toggle(it.id)} role="radio" aria-checked={on} aria-disabled={unpriced || undefined}
+                    tabIndex={unpriced ? -1 : 0} onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(it.id); } }}>
+                    <div className={"svc-radio" + (on ? " on" : "")} />
                     <div className="nm">
                       {it.name}
-                      {it.description ? <small>{it.description}</small> : null}
+                      {it.coverage || it.description ? <small>{it.coverage || it.description}</small> : null}
                       {unpriced ? <small>Not priced for this model yet</small> : null}
                     </div>
                     <div className="pr">
@@ -217,7 +290,7 @@ export default function PricingPage() {
               <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="notes">Notes for White Glove Auto</label><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special requests…" /></div>
             </div>
             <div className="db-actions">
-              <button className="btn-ghost" disabled={busy || !totals.count} onClick={() => save(false)}>Save quote</button>
+              <button className="btn-ghost" disabled={busy || !totals.count} onClick={() => save(false)}>{editId ? "Save changes" : "Save quote"}</button>
               <button className="btn-primary" disabled={busy || !totals.count} onClick={() => save(true)}>{busy ? "Sending…" : "Submit order"}</button>
             </div>
             {dup ? (

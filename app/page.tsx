@@ -89,7 +89,7 @@ export default function LoginPage() {
       <main>
         <div className="login-stage">
           <div style={{ marginBottom: 40 }}>
-            <CoBrand size="login" logoUrl={tenant?.brand?.logo_url} brandName={tenant?.brand?.name} />
+            <CoBrand size="login" logoUrl={tenant?.brand?.logo_url} brandName={tenant?.brand?.name} wga />
           </div>
           <h1 className="login-title">
             Dealership

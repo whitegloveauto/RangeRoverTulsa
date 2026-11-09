@@ -145,7 +145,7 @@ export default function PriceGrid({
   onAddItem?: (serviceId: string) => Promise<void>;
   onRemoveItem?: (itemId: string) => Promise<void>;
   onToggleItem?: (itemId: string, active: boolean) => Promise<void>;
-  onUpdateService?: (serviceId: string, patch: { name?: string; note?: string; active?: boolean }) => Promise<void>;
+  onUpdateService?: (serviceId: string, patch: { name?: string; note?: string; active?: boolean; group?: string }) => Promise<void>;
   onMove?: (kind: "service" | "item", id: string, dir: -1 | 1) => Promise<void>;
   showInactive?: boolean;
 }) {
@@ -249,6 +249,11 @@ export default function PriceGrid({
         <span className="grow" />
         <span className={"status " + status.kind}>{status.text}</span>
       </div>
+      {mode === "wga" && onUpdateService ? (
+        <datalist id="pick-one-groups">
+          {Array.from(new Set(services.map((x) => x.group).filter(Boolean))).map((g) => <option key={g as string} value={g as string} />)}
+        </datalist>
+      ) : null}
       {services.map((svc) => (
         <div key={svc.id}>
           <div className="svc-editor-head">
@@ -256,6 +261,10 @@ export default function PriceGrid({
               <>
                 <input className="title" defaultValue={svc.name} aria-label="Service name" onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== svc.name) onUpdateService(svc.id, { name: v }); }} />
                 <input className="note" placeholder="NOTE (FILM LINE, WARRANTY…)" defaultValue={svc.note || ""} aria-label="Service note" onBlur={(e) => { if ((e.target.value || "") !== (svc.note || "")) onUpdateService(svc.id, { note: e.target.value }); }} />
+                <label className="group-field" title="Dealers pick one package per service. Give several services the same group name (e.g. PPF Clear and PPF Stealth) and they share one pick.">
+                  <span>Pick-one group</span>
+                  <input placeholder="none" defaultValue={svc.group || ""} aria-label="Pick-one group" list="pick-one-groups" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (svc.group || "")) onUpdateService(svc.id, { group: v }); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                </label>
                 {onMove ? (
                   <span className="move-btns">
                     <button className="link-btn" title="Move service up" onClick={() => onMove("service", svc.id, -1)}>▲</button>

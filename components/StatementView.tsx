@@ -52,8 +52,10 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
       {st ? (
         <div style={{ marginTop: 18, opacity: loading ? 0.5 : 1 }}>
           <div className="stmt-print-head">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto" }} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+            {audience === "wga" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/wga-black.png" alt="White Glove Auto" style={{ height: 22, width: "auto" }} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+            ) : null}
             <div style={{ fontSize: 20, fontWeight: 600, marginTop: 10 }}>Statement · {st.label}{st.cycle === "weekly" || st.cycle === "biweekly" ? "" : ""}</div>
             <div style={{ fontSize: 12, marginTop: 4 }}>
               Bill to <b>{st.dealership.name}</b>{st.dealership.location ? ` · ${st.dealership.location}` : ""}<br />

@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "./supabase";
 import type { PricingBook, DealerService, DealerServiceItem, ModelPrice } from "./types";
 import { getHiddenVehicles } from "./dealerCatalog";
+import { getGroupOverrides, groupFor } from "./serviceGroups";
+import { getCoverageOverrides, coverageFor } from "./coverage";
 
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 
@@ -14,7 +16,7 @@ export async function loadPricingBook(opts: {
 }): Promise<PricingBook> {
   const { brand, dealershipId, canSeeCost, includeInactive } = opts;
 
-  const [svcRes, itemRes, modelRes, priceRes, retailRes, hidden] = await Promise.all([
+  const [svcRes, itemRes, modelRes, priceRes, retailRes, hidden, groups, coverage] = await Promise.all([
     supabaseAdmin.from("dealer_services").select("*").eq("brand", brand).order("sort_order"),
     supabaseAdmin.from("dealer_service_items").select("*").order("sort_order"),
     supabaseAdmin.from("dealer_vehicles").select("id, model, sort_order").eq("brand", brand).eq("active", true).order("sort_order"),
@@ -25,6 +27,8 @@ export async function loadPricingBook(opts: {
       ? supabaseAdmin.from("dealer_retail_prices").select("model, item_id, retail").eq("dealership_id", dealershipId)
       : Promise.resolve({ data: [] as any[], error: null }),
     getHiddenVehicles(dealershipId),
+    getGroupOverrides(brand),
+    getCoverageOverrides(brand),
   ]);
 
   const services = ((svcRes.data || []) as DealerService[]).filter((s) => includeInactive || s.active);
@@ -69,7 +73,10 @@ export async function loadPricingBook(opts: {
   return {
     brand,
     models,
-    services: services.map((s) => ({ ...s, items: items.filter((i) => i.service_id === s.id) })),
+    services: services.map((s) => {
+      const group = groupFor(s, groups);
+      return { ...s, group, items: items.filter((i) => i.service_id === s.id).map((i) => ({ ...i, coverage: coverageFor(i, { ...s, group }, coverage) })) };
+    }),
     prices,
     canSeeCost,
   };

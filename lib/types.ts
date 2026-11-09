@@ -22,6 +22,7 @@ export interface DealerService {
   note: string | null;
   sort_order: number;
   active: boolean;
+  group?: string | null; // "pick one" group shared with other services (e.g. PPF Clear + Stealth)
 }
 
 export interface DealerServiceItem {
@@ -29,8 +30,8 @@ export interface DealerServiceItem {
   service_id: string;
   name: string;
   description: string | null;
-  zones?: string[]; // diagram areas covered (customer packet)
   blurb?: string | null;
+  coverage?: string | null; // "what's included", printed on customer documents (see lib/coverage)
   sort_order: number;
   active: boolean;
 }

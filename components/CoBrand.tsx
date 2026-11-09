@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-// Co-brand lockup: dealership brand badge (left) · divider · White Glove Auto (right).
-// Brand comes from the session when signed in, otherwise from the hostname (/api/tenant).
-export default function CoBrand({ size = "header", logoUrl, brandName }: { size?: "header" | "login"; logoUrl?: string | null; brandName?: string | null }) {
+// Dealership brand badge. The White Glove Auto mark is added ONLY where `wga` is set — the dealer
+// sign-in screen. Everywhere else on the dealership side WGA's logo never appears (their customers
+// shouldn't see who does the work). Brand comes from the session when signed in, otherwise /api/tenant.
+export default function CoBrand({ size = "header", logoUrl, brandName, wga = false }: { size?: "header" | "login"; logoUrl?: string | null; brandName?: string | null; wga?: boolean }) {
   const [logo, setLogo] = useState<string | null>(logoUrl || null);
   const [name, setName] = useState<string>(brandName || "");
   useEffect(() => {
@@ -32,9 +33,13 @@ export default function CoBrand({ size = "header", logoUrl, brandName }: { size?
       ) : (
         <span style={{ height: h, display: "inline-block" }} />
       )}
-      <div style={{ width: 1, height: h * 0.7, background: "var(--stroke)" }} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/wga-white.png" alt="White Glove Auto" style={{ height: wgaHeight, width: "auto", display: "block" }} />
+      {wga ? (
+        <>
+          <div style={{ width: 1, height: h * 0.7, background: "var(--stroke)" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wga-white.png" alt="White Glove Auto" style={{ height: wgaHeight, width: "auto", display: "block" }} />
+        </>
+      ) : null}
     </div>
   );
 }

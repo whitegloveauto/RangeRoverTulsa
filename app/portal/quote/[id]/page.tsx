@@ -1,11 +1,14 @@
 "use client";
 
 import OrderActivity from "@/components/OrderActivity";
+import QuoteDocument from "@/components/QuoteDocument";
+import type { PacketData } from "@/lib/packet";
 import OrderTimeline from "@/components/OrderTimeline";
 
 import Link from "next/link";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { cleanChange, cleanVin } from "@/lib/caret";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 function fmt(n: number) {
@@ -27,10 +30,98 @@ interface QuoteData {
   package_snapshot: any;
   tint_upgrade: boolean;
   alacarte_items: any[];
-  line_items: { service: string; name: string; retail: number }[];
+  line_items: { item_id?: string; service: string; name: string; retail: number }[];
   retail_total: number;
   status: string;
   created_at: string;
+  notes?: string | null;
+}
+
+const money = (n: number) => "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+// Saved quote → order: VIN + dates, then send it to White Glove Auto (same checks as the pricing page).
+function SubmitSavedQuote({ id, quote, onDone }: { id: string; quote: QuoteData; onDone: () => void }) {
+  const router = useRouter();
+  const [vin, setVin] = useState(quote.vehicle_vin || "");
+  const [availableFrom, setAvailableFrom] = useState(quote.available_from || "");
+  const [neededBy, setNeededBy] = useState(quote.needed_by || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [needsEdit, setNeedsEdit] = useState(false);
+  const [dup, setDup] = useState<any>(null);
+  const [repriced, setRepriced] = useState<any>(null);
+  const vinOk = /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
+  const today = new Date().toISOString().slice(0, 10);
+
+  async function submit(opts: { confirmDuplicate?: boolean; confirmPrice?: boolean } = {}) {
+    if (!vinOk) {
+      setErr(vin ? `That VIN has ${vin.length} characters — it needs 17 (no I, O or Q).` : "Enter the VIN to submit the order.");
+      document.getElementById("sq-vin")?.focus();
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    setNeedsEdit(false);
+    const res = await fetch(`/api/quotes/${id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vin, availableFrom, neededBy, confirmDuplicate: !!opts.confirmDuplicate, confirmPrice: !!opts.confirmPrice }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (res.status === 409 && d.duplicate) { setDup(d.duplicate); setRepriced(null); return; }
+    if (res.status === 409 && d.repriced) { setRepriced({ ...d.repriced, confirmDuplicate: !!opts.confirmDuplicate }); setDup(null); return; }
+    if (res.status === 409 && d.alreadySubmitted) { onDone(); return; }
+    if (!res.ok) { setErr(d.error || "Could not submit."); setNeedsEdit(!!d.needsEdit); return; }
+    router.replace(`/portal/quote/${id}?sent=1`);
+    onDone();
+  }
+
+  return (
+    <div className="card submit-saved no-print">
+      <div className="ss-head">
+        <div>
+          <div className="stage-eyebrow">SAVED QUOTE · NOT SENT YET</div>
+          <div className="ss-title">Ready to order? Add the VIN and submit it for install.</div>
+        </div>
+        <Link href={`/portal/pricing?quote=${id}`} className="btn-ghost btn-sm" style={{ display: "inline-block", textDecoration: "none" }}>Edit quote</Link>
+      </div>
+      <div className="ss-fields">
+        <div className="field ss-vin">
+          <label htmlFor="sq-vin">VIN {vin ? <span style={{ color: vinOk ? "var(--gold)" : "var(--text-3)", letterSpacing: 0, textTransform: "none" }}>· {vinOk ? "✓" : `${vin.length}/17`}</span> : null}</label>
+          <input id="sq-vin" value={vin} autoCapitalize="characters" autoCorrect="off" spellCheck={false} className="vin-input" onChange={(e) => cleanChange(e, cleanVin, setVin)} placeholder="17 characters — required to submit" />
+        </div>
+        <div className="field"><label htmlFor="sq-avail">Vehicle available from</label><input id="sq-avail" type="date" value={availableFrom} min={today} onChange={(e) => setAvailableFrom(e.target.value)} /></div>
+        <div className="field"><label htmlFor="sq-need">Needed back by</label><input id="sq-need" type="date" value={neededBy} min={availableFrom || today} onChange={(e) => setNeededBy(e.target.value)} /></div>
+      </div>
+      {dup ? (
+        <div className="dup-warn" role="alert">
+          <b>This car was already ordered.</b> Same VIN as order <b>{dup.quote_number}</b>{dup.ro ? ` (RO ${dup.ro})` : ""}, submitted {new Date(dup.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{dup.by ? ` by ${dup.by}` : ""} — {dup.services || "services on file"}.
+          <div className="dup-actions">
+            <Link href={`/portal/quote/${dup.id}`} className="btn-ghost btn-sm" style={{ display: "inline-block" }}>Open {dup.quote_number}</Link>
+            <button className="btn-primary btn-sm" disabled={busy} onClick={() => submit({ confirmDuplicate: true })}>Submit anyway</button>
+            <button className="link-btn" onClick={() => setDup(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : null}
+      {repriced ? (
+        <div className="dup-warn" role="alert">
+          <b>Prices changed since this quote was saved.</b> Customer price {money(repriced.retail.was)} → <b>{money(repriced.retail.now)}</b>
+          {repriced.cost ? <> · your cost {money(repriced.cost.was)} → <b>{money(repriced.cost.now)}</b></> : null}
+          {repriced.dropped ? <> · a service on this quote is no longer offered</> : null}.
+          <div className="dup-actions">
+            <button className="btn-primary btn-sm" disabled={busy} onClick={() => submit({ confirmPrice: true, confirmDuplicate: repriced.confirmDuplicate })}>Submit at the new price</button>
+            <Link href={`/portal/pricing?quote=${id}`} className="btn-ghost btn-sm" style={{ display: "inline-block" }}>Edit quote</Link>
+            <button className="link-btn" onClick={() => setRepriced(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : null}
+      {err ? <div className="ss-err" role="alert">{err} {needsEdit ? <Link href={`/portal/pricing?quote=${id}`}>Edit quote</Link> : null}</div> : null}
+      <div className="ss-actions">
+        <button className="btn-primary" disabled={busy} onClick={() => submit()}>{busy ? "Sending…" : "Submit order"}</button>
+      </div>
+    </div>
+  );
 }
 
 function QuoteSheetInner() {
@@ -42,25 +133,34 @@ function QuoteSheetInner() {
   const [events, setEvents] = useState<any[]>([]);
   const [dealership, setDealership] = useState<{ name: string } | null>(null);
   const [brand, setBrand] = useState<{ name: string; logo_url: string } | null>(null);
+  const [doc, setDoc] = useState<PacketData | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetch(`/api/quotes/${params.id}`);
-      if (!res.ok) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-      const data = await res.json();
-      setQuote(data.quote);
-      setEvents(data.events || []);
-      setDealership(data.dealership);
-      setBrand(data.brand || null);
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/quotes/${params.id}`);
+    if (!res.ok) {
+      setNotFound(true);
       setLoading(false);
-    })();
+      return;
+    }
+    const [data, pk] = await Promise.all([res.json(), fetch(`/api/quotes/${params.id}/packet`).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+    if (pk?.data) {
+      setDoc(pk.data);
+      setShareUrl(pk.shareUrl || null);
+    }
+    setQuote(data.quote);
+    setEvents(data.events || []);
+    setDealership(data.dealership);
+    setBrand(data.brand || null);
+    setLoading(false);
   }, [params.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) {
     return (
@@ -86,19 +186,15 @@ function QuoteSheetInner() {
     );
   }
 
-  const dateStr = new Date(quote.created_at).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  // Build line items: package items + tint upgrade + à la carte
-  const packageItems: { name: string; retail: number }[] =
-    quote.package_snapshot?.items || [];
-  const alacarte: { name: string; retail: number }[] = quote.alacarte_items || [];
-  const lines = quote.line_items || [];
-  const byService: Record<string, { name: string; retail: number }[]> = {};
-  for (const l of lines) (byService[l.service] = byService[l.service] || []).push(l);
+  const shareMsg = `Here's the XPEL protection quote for your ${quote.vehicle_year} ${quote.vehicle_model}: ${shareUrl}`;
+  async function copyLink() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  }
 
   return (
     <>
@@ -132,12 +228,15 @@ function QuoteSheetInner() {
             ← BACK
           </button>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link href={`/portal/quote/${params.id}/packet`} className="btn-primary" style={{ textDecoration: "none" }}>
-              Customer packet
-            </Link>
-            <button className="btn-ghost" onClick={() => window.print()}>
-              Print quote
+            <button className="btn-primary" onClick={() => window.print()}>
+              Print / Save PDF
             </button>
+            {shareUrl ? (
+              <>
+                <a className="btn-ghost" style={{ textDecoration: "none" }} href={`sms:?&body=${encodeURIComponent(shareMsg)}`}>Text to customer</a>
+                <button className="btn-ghost" onClick={copyLink}>{copied ? "Link copied ✓" : "Copy customer link"}</button>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -146,298 +245,21 @@ function QuoteSheetInner() {
             <div className="notice ok" style={{ marginBottom: 0 }}>Order <b>{quote.quote_number}</b> is on its way to White Glove Auto{quote.sm_order_number ? <> — ticket <b>RO {quote.sm_order_number}</b> is already open</> : null}. Photos and status updates will show up at the bottom of this page.</div>
           </div>
         ) : null}
-        <main style={{ display: "flex", justifyContent: "center", padding: "40px 20px" }}>
-          <div
-            className="sheet"
-            style={{
-              width: "100%",
-              maxWidth: 780,
-              background: "#FFFFFF",
-              color: "#1A1A1A",
-              padding: "56px 56px 40px",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-            }}
-          >
-            {/* Letterhead */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                borderBottom: "2px solid #0C1A14",
-                paddingBottom: 20,
-                marginBottom: 8,
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6 }}>
-                  {brand?.logo_url ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={brand.logo_url} alt={brand.name} style={{ height: 38, width: "auto", maxWidth: 120, objectFit: "contain", display: "block" }} />
-                      <div style={{ width: 1, height: 30, background: "#DDD9CF" }} />
-                    </>
-                  ) : null}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/wga-black.png"
-                    alt="White Glove Auto"
-                    style={{ height: 26, width: "auto", display: "block" }}
-                  />
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.18em",
-                    color: "#8A7752",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Paint Protection · Ceramic · Window Film
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.2em",
-                    color: "#8A7752",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Prepared For
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'Cormorant Garamond', serif",
-                    fontSize: 18,
-                    color: "#0C1A14",
-                    marginTop: 2,
-                  }}
-                >
-                  {dealership?.name || "—"}
-                </div>
-              </div>
-            </div>
-
-            {/* Title row */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                marginTop: 28,
-                marginBottom: 28,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontStyle: "italic",
-                  fontSize: 34,
-                  color: "#0C1A14",
-                }}
-              >
-                {quote.status === "draft" ? "Protection Quote" : "Protection Order"}
-              </div>
-              <div style={{ textAlign: "right", fontSize: 11, color: "#555" }}>
-                <div>
-                  <b style={{ color: "#0C1A14" }}>{quote.quote_number}</b>
-                </div>
-                <div style={{ marginTop: 2 }}>{dateStr}</div>
-              </div>
-            </div>
-
-            {/* Vehicle block */}
-            <div
-              style={{
-                background: "#F7F4ED",
-                borderLeft: "3px solid #B89968",
-                padding: "16px 20px",
-                marginBottom: 28,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.2em",
-                  color: "#8A7752",
-                  textTransform: "uppercase",
-                  marginBottom: 6,
-                }}
-              >
-                Vehicle
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 22,
-                  color: "#0C1A14",
-                }}
-              >
-                {quote.vehicle_year} {quote.vehicle_model}{" "}
-                <span style={{ fontStyle: "italic", color: "#8A7752" }}>
-                  {quote.vehicle_trim}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 24, marginTop: 8, fontSize: 11, color: "#555", flexWrap: "wrap" }}>
-                {quote.vehicle_vin && <span>VIN: <span className="vin">{quote.vehicle_vin}</span></span>}
-                {quote.available_from && <span>Available from: {quote.available_from}</span>}
-                {quote.needed_by && <span>Needed back by: {quote.needed_by}</span>}
-                {quote.sm_order_number && <span>WGA ticket: RO {quote.sm_order_number}</span>}
-              </div>
-            </div>
-
-            {/* Services (v2 orders) */}
-            {Object.entries(byService).map(([svc, items]) => (
-              <div key={svc} style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 11, letterSpacing: "0.2em", color: "#0C1A14", fontWeight: 700, textTransform: "uppercase", marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid #ddd" }}>{svc}</div>
-                {items.map((it, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", fontSize: 13, color: "#333" }}>
-                    <span>{it.name}</span>
-                    <span style={{ color: "#0C1A14" }}>{fmt(it.retail)}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* Package section */}
-            {quote.package_tier && (
-              <div style={{ marginBottom: 24 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: "0.2em",
-                    color: "#0C1A14",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    marginBottom: 12,
-                    paddingBottom: 6,
-                    borderBottom: "1px solid #ddd",
-                  }}
-                >
-                  {quote.package_tier} Package
-                </div>
-                {packageItems.map((it, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "7px 0",
-                      fontSize: 13,
-                      color: "#333",
-                    }}
-                  >
-                    <span>{it.name}</span>
-                    <span style={{ color: "#0C1A14" }}>{fmt(it.retail)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* À la carte section */}
-            {alacarte.length > 0 && (
-              <div style={{ marginBottom: 24 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: "0.2em",
-                    color: "#0C1A14",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    marginBottom: 12,
-                    paddingBottom: 6,
-                    borderBottom: "1px solid #ddd",
-                  }}
-                >
-                  À La Carte Coverage
-                </div>
-                {alacarte.map((it, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "7px 0",
-                      fontSize: 13,
-                      color: "#333",
-                    }}
-                  >
-                    <span>{it.name}</span>
-                    <span style={{ color: "#0C1A14" }}>{fmt(it.retail)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tint upgrade note */}
-            {quote.tint_upgrade && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#8A7752",
-                  fontStyle: "italic",
-                  marginBottom: 20,
-                }}
-              >
-                + Full-vehicle tint upgrade included
-              </div>
-            )}
-
-            {/* Total */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: 28,
-                padding: "18px 24px",
-                background: "#0C1A14",
-                color: "#F7F4ED",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: "0.22em",
-                  textTransform: "uppercase",
-                  color: "#B89968",
-                }}
-              >
-                Total Investment
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 30,
-                  fontWeight: 500,
-                }}
-              >
-                {fmt(quote.retail_total)}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div
-              style={{
-                marginTop: 36,
-                paddingTop: 18,
-                borderTop: "1px solid #ddd",
-                fontSize: 10,
-                color: "#999",
-                textAlign: "center",
-                letterSpacing: "0.06em",
-                lineHeight: 1.7,
-              }}
-            >
-              All paint protection film installed using XPEL Ultimate Plus 10 with
-              manufacturer warranty. Window tint includes lifetime warranty.
-              <br />
-              White Glove Auto · Tulsa, Oklahoma · This quote is valid for 30
-              days from the date above.
-            </div>
+        {quote.status !== "draft" && (quote.available_from || quote.needed_by || quote.sm_order_number) ? (
+          <div className="no-print internal-strip">
+            <span className="lbl">Internal · not on the printed quote</span>
+            {quote.available_from ? <span>Available from <b>{quote.available_from}</b></span> : null}
+            {quote.needed_by ? <span>Needed back by <b>{quote.needed_by}</b></span> : null}
+            {quote.sm_order_number ? <span>WGA ticket <b>RO {quote.sm_order_number}</b></span> : null}
           </div>
+        ) : null}
+        {quote.status === "draft" ? (
+          <div className="no-print" style={{ padding: "16px 20px 0", maxWidth: 820, margin: "0 auto" }}>
+            <SubmitSavedQuote id={String(params.id)} quote={quote} onDone={load} />
+          </div>
+        ) : null}
+        <main style={{ display: "flex", justifyContent: "center", padding: "40px 20px" }}>
+          {doc ? <QuoteDocument data={doc} status={quote.status} /> : <div className="loading-text">Loading document…</div>}
         </main>
         {quote.status !== "draft" ? (
           <section className="no-print" style={{ maxWidth: 780, margin: "0 auto", padding: "0 20px 48px" }}>

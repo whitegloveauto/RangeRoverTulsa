@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
+import { setGroup } from "@/lib/serviceGroups";
+import { setCoverage } from "@/lib/coverage";
 
 export const runtime = "nodejs";
 
 // Services + items CRUD (WGA admins).
 // POST body: { action, ...fields }
 //  service.create  {name, note}
-//  service.update  {id, name?, note?, active?, sort_order?}
+//  service.update  {id, name?, note?, active?, sort_order?, group?}  (group = "pick one" group shared with other services; "" = none)
 //  item.create     {service_id, name, description?}
-//  item.update     {id, name?, description?, active?, sort_order?}
+//  item.update     {id, name?, description?, active?, sort_order?, coverage?}  (coverage = "what's included" on customer documents)
 //  item.delete     {id}  (removes pricing for it too, via cascade)
 export async function POST(req: Request) {
   const s = await requireWgaPerm("pricing");
@@ -49,9 +51,16 @@ export async function POST(req: Request) {
       if (b.sort_order !== undefined) patch.sort_order = Number(b.sort_order);
       if (b.product_name !== undefined) patch.product_name = b.product_name || null;
       if (b.blurb !== undefined) patch.blurb = b.blurb || null;
+      if (b.group !== undefined) {
+        const { data: svc } = await supabaseAdmin.from("dealer_services").select("brand").eq("id", b.id).maybeSingle();
+        if (!svc) return fail("Service not found.", 404);
+        if (!(await setGroup(svc.brand, b.id, String(b.group || "")))) return fail("Could not save the group.");
+      }
       if (b.facts !== undefined) patch.facts = Array.isArray(b.facts) ? b.facts.map((f: any) => String(f).trim()).filter(Boolean) : String(b.facts).split("\n").map((f) => f.trim()).filter(Boolean);
-      const { error } = await supabaseAdmin.from("dealer_services").update(patch).eq("id", b.id);
-      if (error) return fail("Could not update service.");
+      if (Object.keys(patch).length) {
+        const { error } = await supabaseAdmin.from("dealer_services").update(patch).eq("id", b.id);
+        if (error) return fail("Could not update service.");
+      }
       return NextResponse.json({ ok: true });
     }
     case "item.create": {
@@ -73,10 +82,18 @@ export async function POST(req: Request) {
       if (b.description !== undefined) patch.description = b.description || null;
       if (b.active !== undefined) patch.active = !!b.active;
       if (b.sort_order !== undefined) patch.sort_order = Number(b.sort_order);
-      if (b.zones !== undefined) patch.zones = Array.isArray(b.zones) ? b.zones.map(String) : [];
       if (b.blurb !== undefined) patch.blurb = b.blurb || null;
-      const { error } = await supabaseAdmin.from("dealer_service_items").update(patch).eq("id", b.id);
-      if (error) return fail("Could not update package.");
+      if (b.coverage !== undefined) {
+        const { data: it } = await supabaseAdmin.from("dealer_service_items").select("service_id").eq("id", b.id).maybeSingle();
+        const { data: svc } = it ? await supabaseAdmin.from("dealer_services").select("brand").eq("id", it.service_id).maybeSingle() : { data: null };
+        const brand = svc?.brand;
+        if (!brand) return fail("Package not found.", 404);
+        if (!(await setCoverage(brand, b.id, String(b.coverage || "")))) return fail("Could not save what's included.");
+      }
+      if (Object.keys(patch).length) {
+        const { error } = await supabaseAdmin.from("dealer_service_items").update(patch).eq("id", b.id);
+        if (error) return fail("Could not update package.");
+      }
       return NextResponse.json({ ok: true });
     }
     case "item.delete": {

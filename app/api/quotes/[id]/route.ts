@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import { tenantByDealershipId } from "@/lib/tenant";
 import { canViewQuote, hideCost } from "@/lib/dealerAccess";
+import { lineCoverage } from "@/lib/coverage";
 
 export const runtime = "nodejs";
 
@@ -34,10 +35,14 @@ export async function GET(
     .eq("quote_id", params.id)
     .order("created_at");
 
-  const tenant = await tenantByDealershipId(session.dealershipId).catch(() => null);
+  const [tenant, coverage] = await Promise.all([
+    tenantByDealershipId(session.dealershipId).catch(() => null),
+    lineCoverage(session.brand, Array.isArray(data.line_items) ? data.line_items : []).catch(() => ({})),
+  ]);
   return NextResponse.json({
     quote: session.canSeeCost ? data : hideCost(data),
     events: events || [],
+    coverage, // item_id → "what's included" (printed under each line)
     brand: tenant ? { name: tenant.brand.name, logo_url: tenant.brand.logo_paper_url || tenant.brand.logo_url } : null,
     dealership: {
       name: session.name,

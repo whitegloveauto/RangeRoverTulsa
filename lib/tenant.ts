@@ -22,7 +22,7 @@ function build(d: any, b: any): Tenant {
     dealership: { id: d.id, slug: d.slug, name: d.name, short_name: d.short_name || d.name, brand: d.brand, brand_key: d.brand_key || "land-rover", location: d.location, hide_cost_from_users: !!d.hide_cost_from_users },
     brand: (() => {
       const key = b?.key || d.brand_key || "land-rover";
-      const logos = brandLogos({ key, make: b?.make || d.brand, name: b?.name || d.brand, logo_light_url: b?.logo_light_url }, d.logo_url);
+      const logos = brandLogos({ key, make: b?.make || d.brand, name: b?.name || d.brand, logo_light_url: b?.logo_light_url }, d.logo_url, { wgaFallback: false });
       return { key, name: b?.name || d.brand, make: b?.make || d.brand, logo_url: logos.screen, logo_paper_url: logos.paper, tagline: b?.tagline || null };
     })(),
     theme,
