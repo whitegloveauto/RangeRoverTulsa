@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import PriceGrid, { type GridChange } from "@/components/PriceGrid";
 import StatementView from "@/components/StatementView";
+import TeamManager, { AccessToggles, type AccessSnapshot } from "@/components/TeamManager";
 import { useDealerSession } from "@/lib/useDealerSession";
-import { useIsPhone } from "@/lib/useIsPhone";
 import type { PricingBook, DealerUser } from "@/lib/types";
 
-// Dealership admin: set your own customer prices, hide WGA cost from your team, manage logins.
+// Dealership admin: your customer prices, your team (per-person access + invites), team defaults, statements.
 export default function DealerSettingsPage() {
   const { session, ready } = useDealerSession();
-  const isPhone = useIsPhone();
   const [tab, setTab] = useState<"pricing" | "team" | "settings" | "statements">("pricing");
   const [notify, setNotify] = useState<{ users: Record<string, string>; extra: string[] }>({ users: {}, extra: [] });
   const [emailOn, setEmailOn] = useState(true);
@@ -19,15 +18,15 @@ export default function DealerSettingsPage() {
   const [notifyMsg, setNotifyMsg] = useState("");
   const [book, setBook] = useState<PricingBook | null>(null);
   const [users, setUsers] = useState<DealerUser[]>([]);
-  const [hideCost, setHideCost] = useState(false);
+  const [snap, setSnap] = useState<AccessSnapshot | null>(null);
   const [msg, setMsg] = useState("");
   const [modal, setModal] = useState<null | { kind: "new" } | { kind: "pw"; user: DealerUser }>(null);
 
   async function loadAll() {
-    const [b, u, s, n] = await Promise.all([fetch("/api/pricing"), fetch("/api/dealer/users"), fetch("/api/dealer/settings"), fetch("/api/dealer/notify")]);
+    const [b, u, a, n] = await Promise.all([fetch("/api/pricing"), fetch("/api/dealer/users"), fetch("/api/dealer/access"), fetch("/api/dealer/notify")]);
     if (b.ok) setBook(await b.json());
     if (u.ok) setUsers((await u.json()).users || []);
-    if (s.ok) setHideCost(!!(await s.json()).settings?.hide_cost_from_users);
+    if (a.ok) setSnap(await a.json());
     if (n.ok) {
       const d = await n.json();
       setNotify(d.prefs);
@@ -43,10 +42,17 @@ export default function DealerSettingsPage() {
     const res = await fetch("/api/dealer/retail", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cells: changes.map((c) => ({ model: c.model, item_id: c.item_id, retail: c.retail ?? null })) }) });
     if (!res.ok) throw new Error((await res.json()).error || "Save failed");
   }
-  async function toggleHide(v: boolean) {
-    setHideCost(v);
-    const res = await fetch("/api/dealer/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hide_cost_from_users: v }) });
-    setMsg(res.ok ? "Saved" : "Could not save");
+  async function saveDefaults(patch: any) {
+    setMsg("");
+    const r = await fetch("/api/dealer/access", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ defaults: patch }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setMsg(d.error || "Could not save");
+    setSnap(d);
+    setMsg("Saved");
+  }
+  async function runSetupAgain() {
+    await fetch("/api/dealer/access", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ setupReset: true }) });
+    window.location.href = "/portal/setup";
   }
   async function saveNotify(body: { users?: Record<string, string>; extra?: string[] }) {
     setNotifyMsg("");
@@ -84,8 +90,8 @@ export default function DealerSettingsPage() {
           </div>
           <div className="tabs">
             <button className={tab === "pricing" ? "active" : ""} onClick={() => setTab("pricing")}>Your prices</button>
-            <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>Team logins</button>
-            <button className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}>Emails &amp; visibility</button>
+            <button className={tab === "team" ? "active" : ""} onClick={() => setTab("team")}>Team</button>
+            <button className={tab === "settings" ? "active" : ""} onClick={() => setTab("settings")}>Team defaults &amp; emails</button>
             <button className={tab === "statements" ? "active" : ""} onClick={() => setTab("statements")}>Statements</button>
           </div>
 
@@ -99,83 +105,14 @@ export default function DealerSettingsPage() {
           ) : null}
 
           {tab === "team" ? (
-            <>
-              <div className="toolbar">
-                <span className="grow" />
-                <button className="btn-primary btn-sm" onClick={() => setModal({ kind: "new" })}>+ Add login</button>
-              </div>
-              {isPhone ? (
-                <div className="order-cards">
-                  {users.map((u) => (
-                    <div key={u.id} className="card" style={{ padding: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                        <b>{u.name}</b>
-                        <span className={"status-pill " + (u.active ? "scheduled" : "cancelled")}>{u.active ? "Active" : "Disabled"}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>{u.email} · last sign-in {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : "never"}{u.must_change_password ? " · must set password" : ""}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                        <div className="field"><label>Role</label>
-                          <select value={u.role} onChange={(e) => userAction({ action: "update", id: u.id, role: e.target.value }).catch((er) => setMsg(er.message))}>
-                            <option value="user">Sales</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </div>
-                        <div className="field"><label>Update emails</label>
-                          <select value={notify.users[u.id] || "mine"} onChange={(e) => saveNotify({ users: { [u.id]: e.target.value } })}>
-                            <option value="mine">Their orders</option>
-                            <option value="all">Every order</option>
-                            <option value="off">Off</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
-                        <button className="link-btn" onClick={() => setModal({ kind: "pw", user: u })}>Reset password</button>
-                        <button className="link-btn danger" onClick={() => userAction({ action: "update", id: u.id, active: !u.active }).catch((er) => setMsg(er.message))}>{u.active ? "Disable" : "Enable"}</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-              <div className="tbl-wrap">
-                <table className="tbl">
-                  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th title="Order and comeback update emails">Update emails</th><th>Status</th><th>Last sign-in</th><th /></tr></thead>
-                  <tbody>
-                    {users.map((u) => (
-                      <tr key={u.id}>
-                        <td><b>{u.name}</b></td>
-                        <td>{u.email}</td>
-                        <td>
-                          <select value={u.role} onChange={(e) => userAction({ action: "update", id: u.id, role: e.target.value }).catch((er) => setMsg(er.message))}>
-                            <option value="user">Sales</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </td>
-                        <td>
-                          <select value={notify.users[u.id] || "mine"} onChange={(e) => saveNotify({ users: { [u.id]: e.target.value } })}>
-                            <option value="mine">Their orders</option>
-                            <option value="all">Every order</option>
-                            <option value="off">Off</option>
-                          </select>
-                        </td>
-                        <td><span className={"status-pill " + (u.active ? "scheduled" : "cancelled")}>{u.active ? "Active" : "Disabled"}</span>{u.must_change_password ? <div style={{ fontSize: 10, marginTop: 4 }}>Must set password</div> : null}</td>
-                        <td>{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : "Never"}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>
-                          <button className="link-btn" onClick={() => setModal({ kind: "pw", user: u })}>Reset password</button>
-                          <button className="link-btn danger" onClick={() => userAction({ action: "update", id: u.id, active: !u.active }).catch((er) => setMsg(er.message))}>{u.active ? "Disable" : "Enable"}</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              )}
-              <div className="err">{msg}</div>
-            </>
+            snap ? (
+              <TeamManager users={users} snap={snap} meId={session.user.id} onChanged={loadAll} onSetPassword={(u) => setModal({ kind: "pw", user: u })} />
+            ) : <div className="loading-text">Loading your team…</div>
           ) : null}
 
           {tab === "statements" ? (
             <>
-              <div className="notice no-print">Each month&apos;s completed work at White Glove Auto&apos;s price — what you&apos;ll be billed, with your terms. Download the CSV or print it for accounts payable.</div>
+              <div className="notice no-print">Your completed work at White Glove Auto&apos;s price for each pay period — what you&apos;ll be billed and when. Download the CSV or print it for accounts payable.</div>
               <StatementView endpoint="/api/statements" audience="dealer" />
             </>
           ) : null}
@@ -184,7 +121,7 @@ export default function DealerSettingsPage() {
             <>
             <div className="card">
               <h3>Update emails</h3>
-              <p>White Glove Auto emails your team when an order is scheduled, goes into the shop, is complete, gets QC photos or a reply, and when a comeback is updated. By default each person hears about the orders they placed — change that per person on <b>Team logins</b>.</p>
+              <p>White Glove Auto emails your team when an order is scheduled, goes into the shop, is complete, gets QC photos or a reply, and when a comeback is updated. Each person&apos;s level (their orders, every order, or none) is set on <b>Team</b>.</p>
               {!emailOn ? <div className="notice warn" style={{ marginTop: 12 }}>Email sending isn&apos;t switched on yet on White Glove&apos;s side, so nothing goes out until it is. Your settings here are saved either way.</div> : null}
               <div className="field" style={{ marginTop: 14 }}>
                 <label htmlFor="extra">Also send every update to (comma-separated)</label>
@@ -195,13 +132,18 @@ export default function DealerSettingsPage() {
               </div>
               <div className="err" style={{ color: notifyMsg === "Saved" ? "var(--gold-bright)" : undefined }}>{notifyMsg}</div>
             </div>
+            {snap ? (
+              <div className="card">
+                <h3>Team defaults</h3>
+                <p>What a salesperson gets when you add them. Change one person any time on <b>Team</b> — their own settings win. Admins always see everything.</p>
+                <div style={{ marginTop: 10 }}><AccessToggles questions={snap.questions} value={snap.defaults} onChange={(k, v) => saveDefaults({ [k]: v })} /></div>
+                <div className="err" style={{ color: msg === "Saved" ? "var(--gold-bright)" : undefined }}>{msg}</div>
+              </div>
+            ) : null}
             <div className="card">
-              <h3>What your sales team sees</h3>
-              <p>Admins always see White Glove Auto's cost. Turn this on to show your sales team only your customer prices.</p>
-              <label className="check" style={{ marginTop: 16 }}>
-                <input type="checkbox" checked={hideCost} onChange={(e) => toggleHide(e.target.checked)} /> Hide WGA cost from sales users
-              </label>
-              <div className="err" style={{ color: "var(--gold-bright)" }}>{msg}</div>
+              <h3>First-time setup</h3>
+              <p>{snap?.setup?.done ? `Finished${snap.setup.by ? ` by ${snap.setup.by}` : ""}${snap.setup.at ? ` on ${new Date(snap.setup.at).toLocaleDateString()}` : ""}. ` : "Not finished yet. "}Walk through it again to re-answer the questions or invite more people.</p>
+              <button className="btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={runSetupAgain}>Run setup again</button>
             </div>
             </>
           ) : null}
@@ -236,7 +178,7 @@ function UserModal({ modal, onClose, onSubmit }: { modal: { kind: "new" } | { ki
   return (
     <div className="modal-bg" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={go}>
-        <h3>{modal.kind === "new" ? "Add a login" : `Reset password · ${modal.user.name}`}</h3>
+        <h3>{modal.kind === "new" ? "Add a login" : `Set a password · ${modal.user.name}`}</h3>
         {modal.kind === "new" ? (
           <div style={{ display: "grid", gap: 14 }}>
             <div className="field"><label htmlFor="un">Name</label><input id="un" value={name} onChange={(e) => setName(e.target.value)} required /></div>

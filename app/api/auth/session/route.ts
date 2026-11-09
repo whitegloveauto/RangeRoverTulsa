@@ -15,7 +15,8 @@ export async function GET() {
     dealership: { name: session.name, brand: session.brand, location: session.location, short_name: t?.dealership.short_name || session.name },
     brand: t?.brand || null,
     theme: t?.theme || null,
-    user: { name: session.userName, email: session.userEmail, role: session.role, canSeeCost: session.canSeeCost },
+    user: { id: session.userId, name: session.userName, email: session.userEmail, role: session.role, canSeeCost: session.canSeeCost, access: session.access },
     viewAs: session.viewAs || null,
+    needsSetup: !!session.needsSetup,
   });
 }

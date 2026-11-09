@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SessionClaims } from "./types";
 import { supabaseAdmin } from "./supabase";
 import { ALL_PERMS, DEFAULT_PERMS, hasPerm } from "./perms";
+import { getAccessDoc, resolveAccess } from "./dealerAccess";
 
 // Two independent cookies so a WGA admin can be signed in to their side while
 // also testing the dealership side in the same browser.
@@ -84,14 +85,20 @@ export async function getSession(): Promise<SessionClaims | null> {
   const s = await verifySession(token);
   if (!s || s.kind !== "dealer") return null;
   // Deactivating a dealership or a login must take effect now, not when the 30-day cookie expires.
+  // Access (cost visibility etc.) is also read live, so an admin's change applies on the next tap.
+  const [{ data: d }, doc, u] = await Promise.all([
+    supabaseAdmin.from("dealer_dealerships").select("active, hide_cost_from_users").eq("id", s.dealershipId).maybeSingle(),
+    getAccessDoc(s.dealershipId),
+    s.userId && !s.viewAs ? supabaseAdmin.from("dealer_users").select("active, role").eq("id", s.userId).maybeSingle().then((r) => r.data) : Promise.resolve(null),
+  ]);
   if (!s.viewAs) {
-    const { data: d } = await supabaseAdmin.from("dealer_dealerships").select("active").eq("id", s.dealershipId).maybeSingle();
     if (!d?.active) return null;
-    if (s.userId) {
-      const { data: u } = await supabaseAdmin.from("dealer_users").select("active").eq("id", s.userId).maybeSingle();
-      if (u && !u.active) return null;
-    }
+    if (u && !u.active) return null;
+    if (u) s.role = u.role === "admin" ? "admin" : "user"; // role changes apply immediately too
   }
+  s.access = resolveAccess(doc, s.viewAs ? null : s.userId, s.role, !!d?.hide_cost_from_users);
+  s.canSeeCost = s.access.see_cost;
+  s.needsSetup = s.role === "admin" && !s.viewAs && !doc.setup?.done;
   return s;
 }
 

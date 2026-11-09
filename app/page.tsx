@@ -19,7 +19,12 @@ export default function LoginPage() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("reset") === "1") setNotice("Password updated — sign in with your new one.");
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("reset") === "1") setNotice("Password updated — sign in with your new one.");
+    if (q.get("welcome") === "1") {
+      setNotice("You're all set — sign in with the password you just chose.");
+      if (q.get("email")) setEmail(q.get("email") || "");
+    }
   }, []);
 
   async function sendReset() {

@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { DealerAccess } from "@/lib/dealerAccess";
 
 export interface DealerSessionInfo {
   dealership: { name: string; brand: string; location: string | null; short_name?: string };
   brand?: { key: string; name: string; make: string; logo_url: string; logo_paper_url?: string; tagline: string | null } | null;
-  user: { name: string; email: string; role: "admin" | "user"; canSeeCost: boolean };
+  user: { id?: string | null; name: string; email: string; role: "admin" | "user"; canSeeCost: boolean; access?: DealerAccess };
+  viewAs?: string | null;
+  needsSetup?: boolean;
 }
 
-// Loads the dealer session; redirects to the login page when there isn't one.
+export const SETUP_SKIP_KEY = "wga-setup-skip";
+
+// Loads the dealer session; redirects to the login page when there isn't one, and sends a
+// dealer admin who hasn't done first-time setup to /portal/setup (unless they chose "later" this visit).
 export function useDealerSession() {
   const router = useRouter();
+  const path = usePathname();
   const [session, setSession] = useState<DealerSessionInfo | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -21,11 +28,20 @@ export function useDealerSession() {
           router.replace("/");
           return;
         }
-        setSession(await r.json());
+        const d: DealerSessionInfo = await r.json();
+        let skipped = false;
+        try {
+          skipped = sessionStorage.getItem(SETUP_SKIP_KEY) === "1";
+        } catch {}
+        if (d.needsSetup && !skipped && path && !path.startsWith("/portal/setup") && !path.startsWith("/portal/password")) {
+          router.replace("/portal/setup");
+          return;
+        }
+        setSession(d);
         setReady(true);
       })
       .catch(() => router.replace("/"));
-  }, [router]);
+  }, [router, path]);
   return { session, ready };
 }
 

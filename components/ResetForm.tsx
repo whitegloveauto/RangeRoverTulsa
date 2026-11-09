@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Choose-a-new-password form behind an emailed reset link (dealer and WGA sides).
-export default function ResetForm({ api, signInHref }: { api: string; signInHref: string }) {
+export default function ResetForm({ api, signInHref, welcome = false }: { api: string; signInHref: string; welcome?: boolean }) {
   const router = useRouter();
   const [token, setToken] = useState("");
   const [state, setState] = useState<"checking" | "ok" | "dead">("checking");
@@ -41,7 +41,7 @@ export default function ResetForm({ api, signInHref }: { api: string; signInHref
       setBusy(false);
       return;
     }
-    router.push(`${signInHref}?reset=1`);
+    router.push(welcome ? `${signInHref}?welcome=1&email=${encodeURIComponent(who.email)}` : `${signInHref}?reset=1`);
   }
 
   if (state === "checking") return <div className="loading-text">Checking your link…</div>;
@@ -49,20 +49,20 @@ export default function ResetForm({ api, signInHref }: { api: string; signInHref
     return (
       <>
         <h1 className="login-title">Link expired.</h1>
-        <p className="login-sub">Reset links work once and only for an hour. Go back to sign-in and tap &ldquo;Forgot your password?&rdquo; for a fresh one.</p>
+        <p className="login-sub">{welcome ? "Invite links work once and only for 7 days. Ask whoever invited you to send a new one." : "Reset links work once and only for an hour. Go back to sign-in and tap “Forgot your password?” for a fresh one."}</p>
         <a className="btn-primary" href={signInHref} style={{ display: "inline-block", textAlign: "center", textDecoration: "none" }}>Back to sign-in</a>
       </>
     );
   return (
     <>
-      <h1 className="login-title">New password.</h1>
-      <p className="login-sub">{who.name ? `${who.name.split(" ")[0]}, pick` : "Pick"} a password only you know — 8 characters or more.</p>
+      <h1 className="login-title">{welcome ? `Welcome${who.name ? `, ${who.name.split(" ")[0]}` : ""}.` : "New password."}</h1>
+      <p className="login-sub">{welcome ? `Choose a password for ${who.email || "your login"} — 8 characters or more. You'll use it to sign in from now on.` : `${who.name ? `${who.name.split(" ")[0]}, pick` : "Pick"} a password only you know — 8 characters or more.`}</p>
       <form className="login-form" onSubmit={go}>
         {/* lets iOS / password managers save the new password against the right account */}
         <input type="email" autoComplete="username" value={who.email} readOnly hidden />
         <div className="field"><label htmlFor="np">New password</label><input id="np" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} autoFocus /></div>
         <div className="field"><label htmlFor="np2">Confirm new password</label><input id="np2" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} /><div className="login-err">{err}</div></div>
-        <button className="btn-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+        <button className="btn-primary" type="submit" disabled={busy}>{busy ? "Saving…" : welcome ? "Create my login" : "Save password"}</button>
       </form>
     </>
   );

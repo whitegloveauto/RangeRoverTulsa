@@ -18,6 +18,8 @@ interface DealershipRow {
   logo_url: string | null;
   location: string | null;
   billing_terms: number;
+  billing?: { cycle: "receipt" | "weekly" | "biweekly" | "net"; net_days: number; pay_day: number; anchor?: string };
+  billing_label?: string;
   active: boolean;
   hide_cost_from_users: boolean;
 }
@@ -77,7 +79,7 @@ export default function WgaDealershipsPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">DEALERSHIPS</div>
             <div className="stage-title">Who's on the program.</div>
-            <div className="stage-sub">Each dealership has its own logins, its own subdomain and its manufacturer&apos;s look. Dealer admins can set their own retail, hide our cost from their sales team, and manage their people. Sales users quote and submit orders.</div>
+            <div className="stage-sub">Each dealership has its own logins, its own subdomain and its manufacturer&apos;s look. Dealer admins set their own retail, decide per person what their salespeople can see (including our cost), and invite their people. Sales users quote and submit orders.</div>
           </div>
           <div className="toolbar" style={{ marginBottom: 18 }}>
             <button className="btn-primary btn-sm" onClick={() => setModal({ kind: "new" })}>+ Add dealership</button>
@@ -107,8 +109,8 @@ export default function WgaDealershipsPage() {
                 </div>
                 <div style={{ display: "flex", gap: 24, flexWrap: "wrap", margin: "16px 0" }}>
                   <label className="check"><input type="checkbox" checked={d.active} onChange={(e) => { if (!e.target.checked && !confirm(`Deactivate ${d.name}? Every one of their logins stops working immediately and their portal link goes dark until you turn it back on.`)) { e.preventDefault(); return; } act({ action: "dealership.update", id: d.id, active: e.target.checked }).catch((er) => setMsg(er.message)); }} /> Active</label>
-                  <TermsField value={d.billing_terms} onSave={(n) => act({ action: "dealership.update", id: d.id, billing_terms: n })} />
-                  <label className="check"><input type="checkbox" checked={d.hide_cost_from_users} onChange={(e) => act({ action: "dealership.update", id: d.id, hide_cost_from_users: e.target.checked }).catch((er) => setMsg(er.message))} /> Hide WGA cost from their sales users</label>
+                  <BillingField value={d.billing || { cycle: "net", net_days: d.billing_terms || 30, pay_day: 5 }} onSave={(t) => act({ action: "dealership.billing", id: d.id, billing: t })} />
+                  <span style={{ fontSize: 12, color: "var(--text-3)" }} title="Set by their admin in Settings → Team / Team defaults">Who sees cost: their admin decides, per person</span>
                 </div>
                 {/* Phones: one card per login */}
                 <div className="user-cards">
@@ -244,28 +246,47 @@ function AccountModal({ modal, onClose, act }: { modal: any; onClose: () => void
   );
 }
 
-// Net payment terms for one dealership — type the days, it saves when you leave the box (or hit Enter).
-function TermsField({ value, onSave }: { value: number; onSave: (n: number) => Promise<void> }) {
-  const [text, setText] = useState(String(value ?? 30));
+// How a dealership pays us. Picking an option saves it; statements follow it.
+type Billing = { cycle: "receipt" | "weekly" | "biweekly" | "net"; net_days: number; pay_day: number; anchor?: string };
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const PRESETS: { id: string; label: string; t: Partial<Billing> }[] = [
+  { id: "receipt", label: "Due on receipt", t: { cycle: "receipt" } },
+  { id: "weekly", label: "Weekly", t: { cycle: "weekly" } },
+  { id: "biweekly", label: "Every 2 weeks", t: { cycle: "biweekly" } },
+  { id: "net15", label: "Net 15", t: { cycle: "net", net_days: 15 } },
+  { id: "net30", label: "Net 30", t: { cycle: "net", net_days: 30 } },
+  { id: "net45", label: "Net 45", t: { cycle: "net", net_days: 45 } },
+  { id: "net60", label: "Net 60", t: { cycle: "net", net_days: 60 } },
+  { id: "custom", label: "Net — custom days", t: { cycle: "net" } },
+];
+const presetOf = (b: Billing) => (b.cycle !== "net" ? b.cycle : [15, 30, 45, 60].includes(b.net_days) ? `net${b.net_days}` : "custom");
+
+function BillingField({ value, onSave }: { value: Billing; onSave: (b: Billing) => Promise<void> }) {
+  const [b, setB] = useState<Billing>(value);
+  const [preset, setPreset] = useState(presetOf(value));
+  const [days, setDays] = useState(String(value.net_days ?? 30));
   const [state, setState] = useState<"" | "saving" | "saved" | "err">("");
   const [err, setErr] = useState("");
-  const focused = useRef(false);
+  const daysRef = useRef<HTMLInputElement>(null);
+  const [focusDays, setFocusDays] = useState(false);
   useEffect(() => {
-    if (!focused.current) setText(String(value ?? 30));
-  }, [value]);
-  async function commit() {
-    focused.current = false;
-    const n = Number(text);
-    if (!text || !Number.isInteger(n) || n < 0 || n > 180) {
-      setErr("0–180 days");
-      setState("err");
-      setText(String(value ?? 30));
-      return;
+    if (focusDays && daysRef.current) {
+      daysRef.current.focus();
+      daysRef.current.select();
+      setFocusDays(false);
     }
-    if (n === value) return;
+  }, [focusDays, preset]);
+  useEffect(() => {
+    setB(value);
+    setPreset(presetOf(value));
+    setDays(String(value.net_days ?? 30));
+  }, [value]);
+  async function save(next: Billing) {
+    setB(next);
     setState("saving");
+    setErr("");
     try {
-      await onSave(n);
+      await onSave(next);
       setState("saved");
       setTimeout(() => setState((s) => (s === "saved" ? "" : s)), 2000);
     } catch (e: any) {
@@ -273,21 +294,54 @@ function TermsField({ value, onSave }: { value: number; onSave: (n: number) => P
       setState("err");
     }
   }
+  function pick(id: string) {
+    setPreset(id);
+    if (id === "custom") {
+      setFocusDays(true); // jump into the day box with the number selected, ready to type over
+      return;
+    }
+    const p = PRESETS.find((x) => x.id === id)!;
+    save({ ...b, ...p.t, anchor: p.t.cycle === "biweekly" ? b.anchor : undefined } as Billing);
+  }
+  function commitDays() {
+    const n = Number(days);
+    if (!days || !Number.isInteger(n) || n < 1 || n > 180) {
+      setErr("1–180 days");
+      setState("err");
+      return;
+    }
+    if (b.cycle === "net" && n === b.net_days) return;
+    save({ ...b, cycle: "net", net_days: n });
+  }
   return (
-    <label className="terms-field" title="Payment terms on this dealership's monthly statement">
-      <span>Payment terms · Net</span>
-      <input
-        inputMode="numeric"
-        aria-label="Net terms in days"
-        value={text}
-        onFocus={(e) => { focused.current = true; setErr(""); setState(""); const el = e.target; setTimeout(() => document.activeElement === el && el.select(), 0); }}
-        onChange={(e) => cleanChange(e, (x) => x.replace(/\D/g, "").slice(0, 3), setText)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-      />
-      <span>days</span>
+    <div className="billing-field" title="How this dealership pays you — statements follow it">
+      <span className="bf-label">Payment terms</span>
+      <select aria-label="Payment terms" value={preset} onChange={(e) => pick(e.target.value)}>
+        {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+      </select>
+      {preset === "custom" ? (
+        <span className="bf-inline">
+          Net
+          <input ref={daysRef} inputMode="numeric" aria-label="Net days" value={days} onChange={(e) => cleanChange(e, (x) => x.replace(/\D/g, "").slice(0, 3), setDays)} onBlur={commitDays} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
+          days
+        </span>
+      ) : null}
+      {b.cycle === "weekly" || b.cycle === "biweekly" ? (
+        <span className="bf-inline">
+          paid
+          <select aria-label="Pay day" value={b.pay_day} onChange={(e) => save({ ...b, pay_day: Number(e.target.value), anchor: undefined })}>
+            {DAYS.map((d, i) => <option key={d} value={i}>{d}s</option>)}
+          </select>
+        </span>
+      ) : null}
+      {b.cycle === "biweekly" ? (
+        <span className="bf-inline">
+          next pay day
+          <input key={b.anchor || "none"} type="date" aria-label="Next pay day" defaultValue={b.anchor || ""} onBlur={(e) => { const v = e.target.value; if (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && v !== b.anchor) save({ ...b, anchor: v, pay_day: new Date(v + "T12:00:00").getDay() }); }} />
+        </span>
+      ) : null}
       <span className={"terms-state " + state}>{state === "saving" ? "Saving…" : state === "saved" ? "Saved" : state === "err" ? err : ""}</span>
-    </label>
+    </div>
   );
 }
 

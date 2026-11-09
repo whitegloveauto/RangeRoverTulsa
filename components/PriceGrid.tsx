@@ -25,7 +25,6 @@ type Book = Record<string, Record<string, Cell>>;
 const EMPTY: Cell = { cost: null, suggested_retail: null, retail: null };
 const SEP = "\u0001";
 const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
-const raw = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 const cleanMoney = (s: string) => {
   const t = s.replace(/[^0-9.]/g, "");
   const i = t.indexOf(".");
@@ -41,7 +40,7 @@ function fromBook(book: PricingBook): Book {
   return out;
 }
 
-// One price box. While focused it shows exactly what was typed (no commas, cursor stays put);
+// One price box. While you type it shows exactly what you typed (cursor stays put);
 // on blur it shows the formatted number. Server updates only land while it isn't focused.
 const PriceInput = memo(function PriceInput({
   id,
@@ -87,7 +86,8 @@ const PriceInput = memo(function PriceInput({
       onFocus={(e) => {
         focused.current = true;
         keyedSinceFocus.current = false;
-        setText(raw(current.current));
+        // the text isn't touched on focus (changing it here races with taps, autofill and paste);
+        // the first edit drops the commas and blur puts them back
         // Keyboard focus (Tab / Next): select the number right away so typing replaces it.
         // Tap/click focus: select on release instead (the press would otherwise drop a cursor and undo it).
         if (!justFocused.current) {

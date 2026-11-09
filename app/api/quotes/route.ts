@@ -1,3 +1,4 @@
+import { hideCost } from "@/lib/dealerAccess";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
@@ -8,7 +9,7 @@ import type { OrderLine } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-// GET /api/quotes — this dealership's quotes/orders (users see their own, admins see all)
+// GET /api/quotes — this dealership's quotes/orders (admins + people allowed to see everyone's; others their own)
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -21,11 +22,11 @@ export async function GET() {
     .eq("dealership_id", session.dealershipId)
     .order("created_at", { ascending: false })
     .limit(100);
-  if (session.role !== "admin" && session.userId) q = q.eq("dealer_user_id", session.userId);
+  if (session.role !== "admin" && session.userId && !session.access?.see_all_orders) q = q.eq("dealer_user_id", session.userId);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: "Could not load quotes." }, { status: 500 });
 
-  const quotes = (data || []).map((r) => (session.canSeeCost ? r : { ...r, cost_total: null, gross_total: null }));
+  const quotes = (data || []).map((r) => (session.canSeeCost ? r : hideCost(r)));
   return NextResponse.json({ quotes });
 }
 

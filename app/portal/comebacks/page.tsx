@@ -58,6 +58,9 @@ export default function ComebacksPage() {
   }
 
   if (!ready || !session) return <div className="frame"><main><div className="loading-stage"><div className="loading-text">Loading…</div></div></main></div>;
+  if (session.user.access?.comebacks === false) {
+    return <div className="frame"><AppHeader dealershipName={session.dealership.name} role={session.user.role} userName={session.user.name} /><main><div className="stage"><div className="notice warn">Comebacks aren&apos;t turned on for your login. Ask your dealership admin.</div></div></main></div>;
+  }
 
   return (
     <div className="frame">

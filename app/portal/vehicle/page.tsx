@@ -1,5 +1,6 @@
 "use client";
 
+import { SETUP_SKIP_KEY } from "@/lib/useDealerSession";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -26,6 +27,15 @@ export default function VehiclePage() {
         return;
       }
       const sess = await sessRes.json();
+      // dealer admins land in first-time setup until it's done (unless they chose "finish later" this visit)
+      let skipped = false;
+      try {
+        skipped = sessionStorage.getItem(SETUP_SKIP_KEY) === "1";
+      } catch {}
+      if (sess.needsSetup && !skipped) {
+        router.replace("/portal/setup");
+        return;
+      }
       setDealershipName(sess.dealership.name);
       setWho(sess.user || null);
 

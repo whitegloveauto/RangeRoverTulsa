@@ -22,12 +22,14 @@ export default function AppHeader({
   const [viewAs, setViewAs] = useState<string | null>(null);
   const [brand, setBrand] = useState<{ logo_url: string; name: string } | null>(null);
   const [themeStyle, setThemeStyle] = useState<string>("");
+  const [access, setAccess] = useState<{ master_sheet?: boolean; comebacks?: boolean } | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         setViewAs(d?.viewAs || null);
+        if (d?.user?.access) setAccess(d.user.access);
         if (d?.brand) setBrand(d.brand);
         // the signed-in dealership's theme wins over the hostname's (matters for WGA "view as")
         if (d?.theme) setThemeStyle(themeCss(d.theme));
@@ -48,8 +50,8 @@ export default function AppHeader({
   const links = [
     { href: "/portal/vehicle", label: "New Quote" },
     { href: "/portal/orders", label: "Orders" },
-    { href: "/portal/master", label: "Master Sheet" },
-    { href: "/portal/comebacks", label: "Comebacks" },
+    ...(access?.master_sheet === false ? [] : [{ href: "/portal/master", label: "Master Sheet" }]),
+    ...(access?.comebacks === false ? [] : [{ href: "/portal/comebacks", label: "Comebacks" }]),
     ...(role === "admin" ? [{ href: "/portal/settings", label: "Settings" }] : []),
   ];
 

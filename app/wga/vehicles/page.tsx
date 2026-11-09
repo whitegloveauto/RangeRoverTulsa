@@ -12,10 +12,12 @@ interface VehicleRow {
   trim: string;
   sort_order: number;
   active: boolean;
+  offered: boolean; // shown to the selected dealership
 }
 
-// WGA admin: the vehicle catalog (year → model → trims) dealers pick from.
-// Pricing is per model, so trims only exist so the right pattern gets cut.
+// WGA admin: each dealership's vehicle catalog (year → model → trims) — what their people can pick.
+// The list comes from the manufacturer's catalog; hide/show is per dealership. Pricing is per model,
+// so trims only exist so the right pattern gets cut.
 export default function WgaVehiclesPage() {
   const { session, ready } = useWgaSession();
   const [rows, setRows] = useState<VehicleRow[]>([]);
@@ -25,6 +27,9 @@ export default function WgaVehiclesPage() {
   const [newYear, setNewYear] = useState("");
   const [addTrim, setAddTrim] = useState<{ model: string; trim: string } | null>(null);
   const [newModel, setNewModel] = useState({ model: "", trim: "" });
+  const [dealer, setDealer] = useState<{ id: string; name: string; short_name: string; brand: string } | null>(null);
+  const [sharedWith, setSharedWith] = useState<string[]>([]);
+  const [ctx, setCtx] = useState<{ dealerships: any[]; selected: any } | null>(null);
 
   async function load() {
     const r = await fetch("/api/wga/vehicles");
@@ -32,12 +37,21 @@ export default function WgaVehiclesPage() {
       const d = await r.json();
       const v: VehicleRow[] = d.vehicles || [];
       setRows(v);
+      setDealer(d.dealership || null);
+      setSharedWith(d.sharedWith || []);
       setYear((y) => y ?? (v.length ? Math.max(...v.map((x) => x.year)) : null));
     }
   }
   useEffect(() => {
-    if (ready) load();
+    if (!ready) return;
+    load();
+    fetch("/api/wga/context").then((r) => (r.ok ? r.json() : null)).then(setCtx).catch(() => {});
   }, [ready]);
+
+  async function pickDealer(id: string) {
+    await fetch("/api/wga/context", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    window.location.reload(); // header switcher, pricing and statements follow the same pick
+  }
 
   async function act(body: any) {
     setMsg("");
@@ -77,10 +91,18 @@ export default function WgaVehiclesPage() {
       <main>
         <div className="stage" style={{ maxWidth: 1100 }}>
           <div className="stage-head">
-            <div className="stage-eyebrow">VEHICLE CATALOG</div>
+            <div className="stage-eyebrow">VEHICLE CATALOG{dealer ? ` · ${dealer.short_name.toUpperCase()}` : ""}</div>
             <div className="stage-title">Years, models, trims.</div>
-            <div className="stage-sub">What dealers can pick when they build an order. Pricing is per model, so a new trim needs no pricing — it just makes sure the right pattern gets cut. When a new model year drops, copy the previous year and adjust.</div>
+            <div className="stage-sub">What {dealer ? dealer.short_name : "the dealership"} can pick when they build an order. Hide anything they don&apos;t sell — it only changes their list. Pricing is per model, so a new trim needs no pricing; it just makes sure the right pattern gets cut. When a new model year drops, copy the previous year and adjust.</div>
           </div>
+          {ctx && ctx.dealerships.length > 1 ? (
+            <div className="dealer-pick">
+              <span>Catalog for</span>
+              {ctx.dealerships.map((d) => (
+                <button key={d.id} className={"chip" + (dealer?.id === d.id ? " on" : "")} onClick={() => dealer?.id !== d.id && pickDealer(d.id)}>{d.short_name || d.name}</button>
+              ))}
+            </div>
+          ) : null}
           {msg ? <div className="notice warn">{msg}</div> : null}
 
           <div className="tabs" style={{ flexWrap: "wrap" }}>
@@ -111,13 +133,13 @@ export default function WgaVehiclesPage() {
           </div>
 
           {models.map(([model, trims]) => {
-            const anyActive = trims.some((t) => t.active);
+            const anyActive = trims.some((t) => t.offered);
             return (
               <div key={model} className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
                   <div>
                     <h3 style={{ marginBottom: 2, opacity: anyActive ? 1 : 0.5 }}>{model}</h3>
-                    <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{year} · {trims.filter((t) => t.active).length} of {trims.length} trims active</div>
+                    <div style={{ fontSize: 11, color: "var(--text-3)", letterSpacing: "0.1em" }}>{year} · {anyActive ? `${trims.filter((t) => t.offered).length} of ${trims.length} trims offered` : `not offered at ${dealer?.short_name || "this dealership"}`}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <span className="move-btns">
@@ -128,15 +150,15 @@ export default function WgaVehiclesPage() {
                       const newName = prompt(`Rename "${model}" across all years (pricing follows the new name):`, model);
                       if (newName && newName.trim() !== model) act({ action: "model.rename", model, newName: newName.trim() });
                     }}>Rename</button>
-                    <button className="btn-ghost btn-sm" disabled={busy} onClick={() => act({ action: "model.setActive", model, year, active: !anyActive })}>{anyActive ? `Hide for ${year}` : `Show for ${year}`}</button>
+                    <button className="btn-ghost btn-sm" disabled={busy} onClick={() => act({ action: "dealer.model", model, year, offered: !anyActive })}>{anyActive ? `Hide ${year}` : `Offer ${year}`}</button>
                     <button className="btn-primary btn-sm" disabled={busy} onClick={() => setAddTrim({ model, trim: "" })}>+ Trim</button>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
                   {trims.map((t) => (
-                    <span key={t.id} className={"status-pill " + (t.active ? "scheduled" : "cancelled")} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                    <span key={t.id} className={"status-pill " + (t.offered ? "scheduled" : "cancelled")} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
                       {t.trim}
-                      <button className="link-btn" title="Toggle active" onClick={() => act({ action: "trim.update", id: t.id, active: !t.active })}>{t.active ? "hide" : "show"}</button>
+                      <button className="link-btn" title={t.offered ? `Hide from ${dealer?.short_name || "this dealership"}` : `Offer at ${dealer?.short_name || "this dealership"}`} onClick={() => act({ action: "dealer.trim", id: t.id, offered: !t.offered })}>{t.offered ? "hide" : "show"}</button>
                       <button className="link-btn danger" title="Delete" onClick={() => confirm(`Delete ${year} ${model} ${t.trim}?`) && act({ action: "trim.delete", id: t.id })}>×</button>
                     </span>
                   ))}
@@ -173,7 +195,7 @@ export default function WgaVehiclesPage() {
               <div className="field"><label>First trim</label><input value={newModel.trim} onChange={(e) => { const v = e.target.value; setNewModel((p) => ({ ...p, trim: v })); }} placeholder="e.g. SE" required /></div>
               <button className="btn-primary btn-sm" disabled={busy || !year}>Add model</button>
             </form>
-            <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10 }}>A new model shows up as a new row on the Pricing grid — price it there before dealers can order it.</p>
+            <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 10 }}>A new model shows up as a new row on the Pricing grid — price it there before dealers can order it.{sharedWith.length ? ` New models and trims go into the ${dealer?.brand || ""} catalog, so ${sharedWith.join(", ")} get${sharedWith.length === 1 ? "s" : ""} them too — hide them there if they don't sell them.` : ""}</p>
           </div>
         </div>
       </main>

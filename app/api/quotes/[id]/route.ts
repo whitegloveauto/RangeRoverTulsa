@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import { tenantByDealershipId } from "@/lib/tenant";
+import { canViewQuote, hideCost } from "@/lib/dealerAccess";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ export async function GET(
     .eq("dealership_id", session.dealershipId) // scope: only own quotes
     .single();
 
-  if (error || !data) {
+  if (error || !data || !canViewQuote(session, data)) {
     return NextResponse.json({ error: "Quote not found." }, { status: 404 });
   }
 
@@ -35,7 +36,7 @@ export async function GET(
 
   const tenant = await tenantByDealershipId(session.dealershipId).catch(() => null);
   return NextResponse.json({
-    quote: data,
+    quote: session.canSeeCost ? data : hideCost(data),
     events: events || [],
     brand: tenant ? { name: tenant.brand.name, logo_url: tenant.brand.logo_paper_url || tenant.brand.logo_url } : null,
     dealership: {

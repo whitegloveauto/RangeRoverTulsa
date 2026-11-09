@@ -1,4 +1,5 @@
 import { brandLogos } from "@/lib/brandLogo";
+import { getBillingTerms, saveBillingTerms, termsLabel } from "@/lib/billing";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -16,7 +17,11 @@ export async function GET() {
   ]);
   const { data: brands } = await supabaseAdmin.from("dealer_brands").select("key, name, make, logo_light_url, theme, tagline").order("name");
   if (d.error || u.error) return NextResponse.json({ error: "Could not load dealerships." }, { status: 500 });
-  return NextResponse.json({ dealerships: d.data || [], users: u.data || [], brands: (brands || []).map((b: any) => ({ ...b, logo_light_url: brandLogos(b).screen })) });
+  const dealerships = await Promise.all((d.data || []).map(async (x: any) => {
+    const billing = await getBillingTerms(x.id, x.billing_terms);
+    return { ...x, billing, billing_label: termsLabel(billing) };
+  }));
+  return NextResponse.json({ dealerships, users: u.data || [], brands: (brands || []).map((b: any) => ({ ...b, logo_light_url: brandLogos(b).screen })) });
 }
 
 // POST — actions
@@ -92,6 +97,12 @@ export async function POST(req: Request) {
       }
       const { error } = await supabaseAdmin.from("dealer_dealerships").update(patch).eq("id", b.id);
       return error ? fail("Could not update dealership.") : NextResponse.json({ ok: true });
+    }
+    case "dealership.billing": {
+      // { id, billing: { cycle: receipt|weekly|biweekly|net, net_days?, pay_day?, anchor? } }
+      if (!b.id || !b.billing) return fail("Missing billing terms.", 400);
+      const t = await saveBillingTerms(b.id, b.billing);
+      return NextResponse.json({ ok: true, billing: t, billing_label: termsLabel(t) });
     }
     case "dealership.password": {
       if (!b.password || String(b.password).length < 8) return fail("Password must be at least 8 characters.", 400);

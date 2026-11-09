@@ -2,16 +2,23 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
+import { getHiddenVehicles, setHiddenVehicles } from "@/lib/dealerCatalog";
 
 export const runtime = "nodejs";
 
 const brandOf = async () => (await selectedDealership())?.brand || "Range Rover";
 
-// GET /api/wga/vehicles — every catalog row (active + inactive) for the admin grid
+// GET /api/wga/vehicles — the selected dealership's catalog: every row for its manufacturer, with
+// `offered` = shown to this dealership (active and not hidden here)
 export async function GET() {
   const s = await requireWgaPerm("vehicles");
   if (!s) return NextResponse.json({ error: "You don't have access to this." }, { status: 403 });
-  const BRAND = await brandOf();
+  const dealer = await selectedDealership();
+  const BRAND = dealer?.brand || "Range Rover";
+  const [hidden, { data: siblings }] = await Promise.all([
+    getHiddenVehicles(dealer?.id),
+    supabaseAdmin.from("dealer_dealerships").select("id, name, short_name").eq("brand", BRAND),
+  ]);
   const { data, error } = await supabaseAdmin
     .from("dealer_vehicles")
     .select("id, year, model, trim, sort_order, active")
@@ -20,7 +27,11 @@ export async function GET() {
     .order("sort_order", { ascending: true })
     .order("trim", { ascending: true });
   if (error) return NextResponse.json({ error: "Could not load vehicles." }, { status: 500 });
-  return NextResponse.json({ vehicles: data || [] });
+  return NextResponse.json({
+    dealership: dealer ? { id: dealer.id, name: dealer.name, short_name: (dealer as any).short_name || dealer.name, brand: BRAND } : null,
+    sharedWith: (siblings || []).filter((x) => x.id !== dealer?.id).map((x) => x.short_name || x.name),
+    vehicles: (data || []).map((r) => ({ ...r, offered: r.active && !hidden.has(r.id) })),
+  });
 }
 
 // POST /api/wga/vehicles — { action, ... }
@@ -125,6 +136,25 @@ export async function POST(req: Request) {
       const { error } = await q;
       if (error) return fail("Could not update model.");
       return NextResponse.json({ ok: true });
+    }
+    // dealer.trim  {id, offered}          — offer / stop offering one trim at the selected dealership
+    // dealer.model {model, year, offered} — same for every trim of a model in one year
+    case "dealer.trim":
+    case "dealer.model": {
+      const dealer = await selectedDealership();
+      if (!dealer) return fail("Pick a dealership first.", 400);
+      let q = supabaseAdmin.from("dealer_vehicles").select("id, active").eq("brand", BRAND);
+      q = b.action === "dealer.trim" ? q.eq("id", b.id) : q.eq("model", clean(b.model)).eq("year", Number(b.year));
+      const { data: rows } = await q;
+      const ids = (rows || []).map((r) => r.id);
+      if (!ids.length) return fail("Nothing to change.", 404);
+      if (b.offered) {
+        // retired rows come back too (they were hidden for every dealership of this make)
+        const retired = (rows || []).filter((r) => !r.active).map((r) => r.id);
+        if (retired.length) await supabaseAdmin.from("dealer_vehicles").update({ active: true }).in("id", retired);
+      }
+      const ok = await setHiddenVehicles(dealer.id, ids, !b.offered);
+      return ok ? NextResponse.json({ ok: true }) : fail("Could not save.");
     }
     default:
       return fail("Unknown action.", 400);

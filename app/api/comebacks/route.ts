@@ -10,6 +10,8 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (s.access && !s.access.comebacks) return NextResponse.json({ error: "Your dealership admin hasn't turned on comebacks for your login." }, { status: 403 });
+  const onlyMine = s.role !== "admin" && !!s.userId && !s.access?.see_all_orders;
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") || "").trim();
   if (q) {
@@ -20,6 +22,7 @@ export async function GET(req: Request) {
       .eq("dealership_id", s.dealershipId)
       .neq("status", "draft")
       .or(`vehicle_vin.ilike.${like},quote_number.ilike.${like},vehicle_model.ilike.${like},sm_order_number.ilike.${like}`)
+      .eq(onlyMine ? "dealer_user_id" : "dealership_id", onlyMine ? s.userId! : s.dealershipId)
       .order("submitted_at", { ascending: false })
       .limit(20);
     return NextResponse.json({ results: data || [] });
@@ -28,6 +31,7 @@ export async function GET(req: Request) {
     .from("dealer_comebacks")
     .select("id, comeback_number, quote_id, vehicle, vin, category, description, status, scheduled_date, wga_notes, sm_order_number, created_by_name, created_at, resolved_at")
     .eq("dealership_id", s.dealershipId)
+    .eq(onlyMine ? "created_by_user_id" : "dealership_id", onlyMine ? s.userId! : s.dealershipId)
     .order("created_at", { ascending: false })
     .limit(100);
   return NextResponse.json({ comebacks: data || [] });
@@ -37,6 +41,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (s.access && !s.access.comebacks) return NextResponse.json({ error: "Your dealership admin hasn't turned on comebacks for your login." }, { status: 403 });
   let b: any;
   try {
     b = await req.json();

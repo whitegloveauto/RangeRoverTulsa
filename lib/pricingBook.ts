@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase";
 import type { PricingBook, DealerService, DealerServiceItem, ModelPrice } from "./types";
+import { getHiddenVehicles } from "./dealerCatalog";
 
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 
@@ -13,16 +14,17 @@ export async function loadPricingBook(opts: {
 }): Promise<PricingBook> {
   const { brand, dealershipId, canSeeCost, includeInactive } = opts;
 
-  const [svcRes, itemRes, modelRes, priceRes, retailRes] = await Promise.all([
+  const [svcRes, itemRes, modelRes, priceRes, retailRes, hidden] = await Promise.all([
     supabaseAdmin.from("dealer_services").select("*").eq("brand", brand).order("sort_order"),
     supabaseAdmin.from("dealer_service_items").select("*").order("sort_order"),
-    supabaseAdmin.from("dealer_vehicles").select("model, sort_order").eq("brand", brand).eq("active", true).order("sort_order"),
+    supabaseAdmin.from("dealer_vehicles").select("id, model, sort_order").eq("brand", brand).eq("active", true).order("sort_order"),
     dealershipId
       ? supabaseAdmin.from("dealer_model_pricing").select("model, item_id, cost, suggested_retail").eq("dealership_id", dealershipId)
       : Promise.resolve({ data: [] as any[], error: null }),
     dealershipId
       ? supabaseAdmin.from("dealer_retail_prices").select("model, item_id, retail").eq("dealership_id", dealershipId)
       : Promise.resolve({ data: [] as any[], error: null }),
+    getHiddenVehicles(dealershipId),
   ]);
 
   const services = ((svcRes.data || []) as DealerService[]).filter((s) => includeInactive || s.active);
@@ -35,6 +37,7 @@ export async function loadPricingBook(opts: {
   const seen = new Set<string>();
   const models: string[] = [];
   for (const r of modelRes.data || []) {
+    if (hidden.has(r.id)) continue; // a model drops off a dealership's grid once every trim is hidden there
     if (!seen.has(r.model)) {
       seen.add(r.model);
       models.push(r.model);

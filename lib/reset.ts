@@ -22,12 +22,12 @@ export async function wgaFingerprint(userId: string): Promise<string> {
   return fp(`wga:${userId}:${data?.updated_at || "none"}`);
 }
 
-export async function makeResetToken(kind: ResetKind, userId: string, fingerprint: string): Promise<string> {
+export async function makeResetToken(kind: ResetKind, userId: string, fingerprint: string, ttl = "1h"): Promise<string> {
   return new SignJWT({ typ: `${kind}-reset`, fp: fingerprint })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
-    .setExpirationTime("1h")
+    .setExpirationTime(ttl)
     .sign(secret());
 }
 

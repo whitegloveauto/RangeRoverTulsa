@@ -35,8 +35,8 @@ export default function WgaStatementsPage() {
         <div className="stage" style={{ maxWidth: 1180 }}>
           <div className="stage-head no-print">
             <div className="stage-eyebrow">STATEMENTS</div>
-            <div className="stage-title">Monthly billing.</div>
-            <div className="stage-sub">Everything completed for a dealership in a month, at White Glove&apos;s price, with their net terms. Download the CSV for QuickBooks or print it as the statement.</div>
+            <div className="stage-title">Billing statements.</div>
+            <div className="stage-sub">Everything completed for a dealership in each pay period — weekly, every 2 weeks or monthly, whatever their terms are — at White Glove&apos;s price. Download the CSV for QuickBooks or print it as the statement.</div>
           </div>
           {ctx && ctx.dealerships.length > 1 ? (
             <div className="tabs" style={{ flexWrap: "wrap" }}>

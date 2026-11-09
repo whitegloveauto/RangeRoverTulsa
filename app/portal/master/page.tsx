@@ -17,6 +17,9 @@ export default function MasterPage() {
     fetch("/api/pricing").then(async (r) => r.ok && setBook(await r.json()));
   }, [ready]);
 
+  if (ready && session && session.user.access?.master_sheet === false) {
+    return <div className="frame"><AppHeader dealershipName={session.dealership.name} role={session.user.role} userName={session.user.name} /><main><div className="stage"><div className="notice warn">The master price sheet isn&apos;t turned on for your login. Ask your dealership admin — you can still print a sheet for any car from New Quote.</div></div></main></div>;
+  }
   if (!ready || !session || !book) {
     return <div className="frame"><main><div className="loading-stage"><div className="loading-text">Loading master sheet…</div></div></main></div>;
   }

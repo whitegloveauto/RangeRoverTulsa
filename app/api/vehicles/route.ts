@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import type { VehicleCatalog } from "@/lib/types";
+import { getHiddenVehicles } from "@/lib/dealerCatalog";
 
 export const runtime = "nodejs";
 
@@ -11,13 +12,13 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const { data, error } = await supabaseAdmin
+  const [{ data, error }, hidden] = await Promise.all([supabaseAdmin
     .from("dealer_vehicles")
-    .select("year, model, trim, sort_order")
+    .select("id, year, model, trim, sort_order")
     .eq("brand", session.brand)
     .eq("active", true)
     .order("year", { ascending: false })
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true }), getHiddenVehicles(session.dealershipId)]);
 
   if (error) {
     return NextResponse.json(
@@ -31,6 +32,7 @@ export async function GET() {
   const yearsSet = new Set<number>();
 
   for (const row of data || []) {
+    if (hidden.has(row.id)) continue; // this dealership doesn't offer it
     yearsSet.add(row.year);
     if (!byYear[row.year]) byYear[row.year] = {};
     if (!byYear[row.year][row.model]) byYear[row.year][row.model] = [];

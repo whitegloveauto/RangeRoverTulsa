@@ -93,4 +93,6 @@ export interface SessionClaims {
   canSeeCost: boolean;
   viewAs?: string | null; // set when a WGA admin is viewing the dealer side as this dealership
   perms?: string[]; // WGA sessions: what this person can see (admins implicitly have all)
+  access?: import("./dealerAccess").DealerAccess; // dealer sessions: resolved live on every request
+  needsSetup?: boolean; // dealer admin who hasn't finished first-time setup
 }

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("dealership") || (await selectedDealership())?.id;
   if (!id) return NextResponse.json({ error: "Pick a dealership." }, { status: 400 });
-  const st = await buildStatement(id, url.searchParams.get("month") || "");
+  const st = await buildStatement(id, url.searchParams.get("period") || url.searchParams.get("month") || null);
   if (!st) return NextResponse.json({ error: "Dealership not found." }, { status: 404 });
   if (url.searchParams.get("format") === "csv") return csvResponse(st, true);
   return NextResponse.json({ statement: st });
