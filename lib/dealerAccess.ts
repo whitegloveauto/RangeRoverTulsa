@@ -59,3 +59,13 @@ export function cleanAccess(input: any): Partial<DealerAccess> {
   for (const q of ACCESS_QUESTIONS) if (typeof input?.[q.key] === "boolean") out[q.key] = input[q.key];
   return out;
 }
+
+
+// The dealership never sees WGA's billing steps: "invoiced" (work done, awaiting payment) reads as
+// complete on their side, and WGA marking it paid isn't a separate event for them.
+export const dealerStatus = (s: string) => (s === "invoiced" ? "complete" : s);
+export function dealerEvents<T extends { from_status?: string | null; to_status?: string | null }>(events: T[]): T[] {
+  return events
+    .filter((e) => !(e.from_status === "invoiced" && e.to_status === "complete"))
+    .map((e) => ({ ...e, from_status: e.from_status ? dealerStatus(e.from_status) : e.from_status, to_status: e.to_status ? dealerStatus(e.to_status) : e.to_status }));
+}

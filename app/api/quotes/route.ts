@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import { VIN_RE, normVin, isoDate, urgencyFor, findDuplicate, priceLines, afterSubmit } from "@/lib/submitOrder";
-import { canViewQuote } from "@/lib/dealerAccess";
+import { canViewQuote, dealerStatus } from "@/lib/dealerAccess";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,7 @@ export async function GET() {
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: "Could not load quotes." }, { status: 500 });
 
-  const quotes = (data || []).map((r) => (session.canSeeCost ? r : hideCost(r)));
+  const quotes = (data || []).map((r) => ({ ...(session.canSeeCost ? r : hideCost(r)), status: dealerStatus(r.status) }));
   return NextResponse.json({ quotes });
 }
 

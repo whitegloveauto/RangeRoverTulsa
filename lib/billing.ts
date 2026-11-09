@@ -3,8 +3,9 @@ import { kvGet, kvSet } from "@/lib/kv";
 
 // How each dealership pays White Glove Auto. Statements follow it:
 //   receipt  — due on receipt; monthly statement of what was completed
-//   weekly   — paid every week on `pay_day`; each statement = the 7 days before that pay day
-//   biweekly — paid every other `pay_day`, lined up with `anchor` (a real pay date); 14-day statements
+//   weekly   — work invoiced in a week (Mon–Sun) is paid on `pay_day` the following week
+//   biweekly — every other `pay_day`, lined up with `anchor` (a real pay date); covers the two
+//              Mon–Sun weeks before the pay date's week
 //   net      — monthly statement, due `net_days` after month end (Net 15 / 30 / …)
 // Stored per dealership in dealer_program_settings (billing:<id>); dealer_dealerships.billing_terms
 // is kept in step as a plain day count for anything older that reads it.
@@ -106,10 +107,14 @@ function monthPeriod(t: BillingTerms, ym: string): BillingPeriod {
   return { key: ym, label, from, to, statementDate: to, dueDate: due, dueLabel: `Net ${t.net_days} · due ${fmt(due, { weekday: "short", month: "short", day: "numeric" })}` };
 }
 
+// Monday of the week (Mon–Sun) that contains ymd
+export const mondayOf = (ymd: string) => addDays(ymd, -((weekday(ymd) + 6) % 7));
+
 function payPeriod(t: BillingTerms, payDate: string): BillingPeriod {
   const len = t.cycle === "weekly" ? 7 : 14;
-  const from = addDays(payDate, -len);
-  const to = addDays(payDate, -1);
+  const weekStart = mondayOf(payDate);
+  const from = addDays(weekStart, -len);
+  const to = addDays(weekStart, -1);
   return {
     key: payDate,
     label: `${short(from)} – ${short(to)}`,
@@ -121,17 +126,32 @@ function payPeriod(t: BillingTerms, payDate: string): BillingPeriod {
   };
 }
 
-// Recent statement periods, newest first; the first one is the one you're about to get paid for.
+// The pay date that covers work invoiced on `ymd` (weekly / every-2-weeks schedules).
+function payDateFor(t: BillingTerms, ymd: string): string {
+  let pay = nextWeekday(addDays(mondayOf(ymd), 7), t.pay_day); // the following week's pay day
+  if (t.cycle === "biweekly" && t.anchor) {
+    const diff = Math.round((toUtcNoon(pay).getTime() - toUtcNoon(t.anchor).getTime()) / 86400000);
+    if (((diff % 14) + 14) % 14) pay = addDays(pay, 7); // not a pay week → the one after
+  }
+  return pay;
+}
+
+// When White Glove Auto should expect payment for work invoiced on `invoicedYmd`.
+export function expectedPayment(t: BillingTerms, invoicedYmd: string): { date: string | null; label: string } {
+  if (t.cycle === "receipt") return { date: invoicedYmd, label: "Due on receipt" };
+  if (t.cycle === "weekly" || t.cycle === "biweekly") {
+    const d = payDateFor(t, invoicedYmd);
+    return { date: d, label: `Expected ${fmt(d, { weekday: "short", month: "short", day: "numeric" })}` };
+  }
+  const due = monthPeriod(t, invoicedYmd.slice(0, 7)).dueDate!;
+  return { date: due, label: `Net ${t.net_days} · due ${fmt(due, { weekday: "short", month: "short", day: "numeric" })}` };
+}
+
+// Recent statement periods, newest first: this week's (still open), then the ones before it.
 export function recentPeriods(t: BillingTerms, count = 12): BillingPeriod[] {
   const today = todayLocal();
   if (t.cycle === "weekly" || t.cycle === "biweekly") {
-    let pay = nextWeekday(today, t.pay_day);
-    if (t.cycle === "biweekly" && t.anchor) {
-      // line up with the anchor (every 14 days from it)
-      const diff = Math.round((toUtcNoon(pay).getTime() - toUtcNoon(t.anchor).getTime()) / 86400000);
-      const mod = ((diff % 14) + 14) % 14;
-      if (mod) pay = addDays(pay, 14 - mod);
-    }
+    const pay = payDateFor(t, today);
     const step = t.cycle === "weekly" ? 7 : 14;
     return Array.from({ length: count }, (_, i) => payPeriod(t, addDays(pay, -step * i)));
   }
@@ -143,10 +163,13 @@ export function recentPeriods(t: BillingTerms, count = 12): BillingPeriod[] {
 }
 
 export function periodFor(t: BillingTerms, key: string | null): BillingPeriod {
-  const list = recentPeriods(t, 1);
+  const list = recentPeriods(t, 3);
   if (t.cycle === "weekly" || t.cycle === "biweekly") {
     if (key && /^\d{4}-\d{2}-\d{2}$/.test(key)) return payPeriod(t, key);
-    return list[0];
+    // default: the oldest period that hasn't been paid yet (last week's work until its pay day passes)
+    const today = todayLocal();
+    const unpaid = list.filter((p) => (p.dueDate || "") >= today);
+    return unpaid[unpaid.length - 1] || list[0];
   }
   if (key && /^\d{4}-\d{2}$/.test(key)) return monthPeriod(t, key);
   // early in the month you're billing last month; later, this month

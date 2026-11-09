@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import { notifyWga } from "@/lib/notify";
+import { dealerStatus } from "@/lib/dealerAccess";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
       .eq(onlyMine ? "dealer_user_id" : "dealership_id", onlyMine ? s.userId! : s.dealershipId)
       .order("submitted_at", { ascending: false })
       .limit(20);
-    return NextResponse.json({ results: data || [] });
+    return NextResponse.json({ results: (data || []).map((r: any) => ({ ...r, status: dealerStatus(r.status) })) });
   }
   const { data } = await supabaseAdmin
     .from("dealer_comebacks")

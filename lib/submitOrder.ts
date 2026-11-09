@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { loadPricingBook } from "@/lib/pricingBook";
 import { notifyWga } from "@/lib/notify";
-import { createShopMonkeyTicket } from "@/lib/shopmonkey";
+import { createShopMonkeyTicket, setShopMonkeyUnit } from "@/lib/shopmonkey";
 import type { OrderLine } from "@/lib/types";
 import { pickOneConflict } from "@/lib/serviceGroups";
 
@@ -81,6 +81,9 @@ export async function afterSubmit(
   });
   // ShopMonkey ticket first so the push can carry the RO number.
   const sm = await createShopMonkeyTicket(quote.id);
+  // dealer order number → the vehicle's Unit field in ShopMonkey (capped so submitting stays quick;
+  // the 10-minute sync finishes it if this runs out of time)
+  if (sm.ok) await Promise.race([setShopMonkeyUnit(quote.id), new Promise((r) => setTimeout(r, 6000))]);
   await notifyWga(
     sm.ok && sm.number ? `New ${session.brand} order · RO ${sm.number}` : `New ${session.brand} order`,
     `${session.name}: ${quote.vehicle_year} ${quote.vehicle_model} ${quote.vehicle_trim} — ${lines.map((l) => l.name).join(", ")} · $${costTotal.toLocaleString("en-US")}${needDate ? ` · needed by ${needDate}${urgency === "urgent" ? " ⚠️" : ""}` : ""}`,

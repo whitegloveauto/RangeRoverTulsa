@@ -1,13 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { emailOrderEvent } from "@/lib/dealerEmail";
+import { setShopMonkeyUnit } from "@/lib/shopmonkey";
 
 // ShopMonkey → portal status sync. Reads each open order's RO through the existing
 // dealer-order-sm edge function (read-only "raw" GET probe — the ShopMonkey key never
 // leaves Supabase) and moves the portal status forward when the shop's workflow does.
-// Never moves an order backwards and never touches complete / cancelled orders.
+// Never moves an order backwards and never touches complete (paid) / cancelled orders.
+// Pipeline: … in progress → invoiced (work done / RO invoiced) → complete (paid).
+// Also makes sure the dealer order number is in the ShopMonkey vehicle's Unit field.
 
-const RANK: Record<string, number> = { new: 0, in_shopmonkey: 1, scheduled: 2, in_progress: 3, complete: 4 };
-const OPEN = ["new", "in_shopmonkey", "scheduled", "in_progress"];
+const RANK: Record<string, number> = { new: 0, in_shopmonkey: 1, scheduled: 2, in_progress: 3, invoiced: 4, complete: 5 };
+const OPEN = ["new", "in_shopmonkey", "scheduled", "in_progress", "invoiced"];
 const BATCH = 12; // per run, least-recently-synced first (keeps a run well under the ~10s function limit)
 const CONCURRENCY = 4;
 
@@ -40,8 +43,9 @@ export function mapShopMonkey(o: any, wfName: string): { status: string | null; 
   const n = (wfName || "").toLowerCase();
   const smStatus = String(o?.status || "");
   if (o?.deleted || o?.archived) return { status: null, why: "RO archived in ShopMonkey" };
-  if (/\b(complete[d]?|done|ready|pick ?up|picked up|delivered|invoiced?|paid|closed)\b/.test(n)) return { status: "complete", why: `workflow “${wfName}”` };
-  if (smStatus === "Invoice" || o?.invoiced === true || o?.paid === true || o?.completedDate || o?.completedAt) return { status: "complete", why: `RO ${smStatus === "Invoice" ? "invoiced" : o?.paid ? "paid" : "completed"}` };
+  if (o?.paid === true || /\bpaid\b/.test(n)) return { status: "complete", why: o?.paid === true ? "RO paid" : `workflow “${wfName}”` };
+  if (/\b(complete[d]?|done|ready|pick ?up|picked up|delivered|invoiced?|closed)\b/.test(n)) return { status: "invoiced", why: `workflow “${wfName}”` };
+  if (smStatus === "Invoice" || o?.invoiced === true || o?.completedDate || o?.completedAt) return { status: "invoiced", why: `RO ${smStatus === "Invoice" || o?.invoiced ? "invoiced" : "completed"}` };
   if (/\b(in progress|progress|in[ -]shop|working|wip|install(ing)?|started|in bay|qc|quality( check)?)\b/.test(n)) return { status: "in_progress", why: `workflow “${wfName}”` };
   if (/\b(scheduled?|appointment|appt|booked|confirmed)\b/.test(n)) return { status: "scheduled", why: `workflow “${wfName}”` };
   return { status: null, why: wfName ? `workflow “${wfName}” (no change)` : "no workflow status" };
@@ -74,6 +78,8 @@ export async function runShopMonkeySync(opts: { dry?: boolean; quoteIds?: string
   if (error) return { ok: false, error: "Could not load orders.", lines: [] as SyncLine[] };
 
   const wf = await workflowNames(token);
+  const started = Date.now();
+  let unitBudget = 3;
   const lines: SyncLine[] = [];
   let sampleKeys: string[] | undefined;
   const queue = [...(orders || [])];
@@ -113,8 +119,17 @@ export async function runShopMonkeySync(opts: { dry?: boolean; quoteIds?: string
               actor_name: "ShopMonkey sync",
               detail: `ShopMonkey ${m.why}${o.sm_order_number ? ` · RO ${o.sm_order_number}` : ""}`,
             });
-            if (m.status === "scheduled" || m.status === "in_progress" || m.status === "complete") await emailOrderEvent(o.id, { kind: "status", status: m.status });
+            // invoiced = the dealer's car is done; paid after invoiced isn't news to them
+            const dealerSt = m.status === "invoiced" ? "complete" : m.status === "complete" && o.status === "invoiced" ? null : m.status;
+            if (dealerSt === "scheduled" || dealerSt === "in_progress" || dealerSt === "complete") await emailOrderEvent(o.id, { kind: "status", status: dealerSt });
           }
+        }
+        // a few Unit fixes per run, early in the run, so the sync stays inside the function time limit
+        if (!opts.dry && unitBudget > 0 && Date.now() - started < 4000) {
+          unitBudget--;
+          const u = await setShopMonkeyUnit(o.id);
+          if (u.note === "already set" || u.note.startsWith("waiting") || u.note.startsWith("no ShopMonkey")) unitBudget++; // no ShopMonkey call made
+          else line.note += ` · Unit: ${u.ok ? "set" : u.note}`;
         }
       } catch (e: any) {
         line.note = `error: ${String(e?.message || e).slice(0, 120)}`;

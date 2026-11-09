@@ -60,19 +60,19 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
             <div style={{ fontSize: 12, marginTop: 4 }}>
               Bill to <b>{st.dealership.name}</b>{st.dealership.location ? ` · ${st.dealership.location}` : ""}<br />
               From White Glove Auto · Tulsa, Oklahoma<br />
-              Work completed {nice(st.from)} – {nice(st.to)} · {st.terms} · {st.dueLabel}
+              Work invoiced {nice(st.from)} – {nice(st.to)} · {st.terms} · {st.dueLabel}
             </div>
           </div>
 
           <div className="stmt-totals">
-            <div><div className="k">Orders completed</div><div className="v">{st.count}</div></div>
+            <div><div className="k">Orders invoiced</div><div className="v">{st.count}</div></div>
             <div><div className="k">{audience === "dealer" ? "Amount due to WGA" : "Bill the dealership"}</div><div className="v">{money(st.total)}</div></div>
             <div><div className="k">{st.terms}</div><div className="v">{st.dueDate ? nice(st.dueDate) : "On receipt"}</div></div>
             <div><div className="k">{audience === "dealer" ? "Your customer retail" : "Dealer retail (their price)"}</div><div className="v">{money(st.retailTotal)}</div></div>
           </div>
 
           {st.count === 0 ? (
-            <div className="card" style={{ textAlign: "center" }}>No completed orders {st.cycle === "weekly" || st.cycle === "biweekly" ? `between ${nice(st.from)} and ${nice(st.to)}` : `in ${st.label}`}.</div>
+            <div className="card" style={{ textAlign: "center" }}>No orders invoiced {st.cycle === "weekly" || st.cycle === "biweekly" ? `between ${nice(st.from)} and ${nice(st.to)}` : `in ${st.label}`}.</div>
           ) : isPhone ? (
             <div className="order-cards">
               {st.lines.map((l: any) => (
@@ -82,7 +82,7 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
                     <b>{money(l.amount)}</b>
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6, lineHeight: 1.5 }}>
-                    {nice(l.completed)} · {l.quote_number}{l.ro ? ` · RO ${l.ro}` : ""}<br />
+                    Invoiced {nice(l.completed)} · {l.quote_number}{l.ro ? ` · RO ${l.ro}` : ""}{l.paid ? " · paid ✓" : ""}<br />
                     {l.vin ? <><span className="vin">VIN {l.vin}</span><br /></> : null}
                     {l.services}
                   </div>
@@ -93,7 +93,7 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead>
-                  <tr><th>Completed</th><th>Order #</th><th>RO #</th><th>Vehicle</th><th>VIN</th><th>Services</th><th>Placed by</th><th style={{ textAlign: "right" }}>Amount</th></tr>
+                  <tr><th>Invoiced</th><th>Order #</th><th>RO #</th><th>Vehicle</th><th>VIN</th><th>Services</th><th>Placed by</th><th>Paid</th><th style={{ textAlign: "right" }}>Amount</th></tr>
                 </thead>
                 <tbody>
                   {st.lines.map((l: any) => (
@@ -105,11 +105,12 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
                       <td className="vin">{l.vin || "—"}</td>
                       <td>{l.services}</td>
                       <td>{l.placed_by || "—"}</td>
+                      <td>{l.paid ? "✓" : "—"}</td>
                       <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{money(l.amount)}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "right" }}><b>Total · {st.count} order{st.count === 1 ? "" : "s"} · {st.terms} · {st.dueLabel}</b></td>
+                    <td colSpan={8} style={{ textAlign: "right" }}><b>Total · {st.count} order{st.count === 1 ? "" : "s"} · {st.terms} · {st.dueLabel}</b></td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}><b>{money(st.total)}</b></td>
                   </tr>
                 </tbody>
@@ -117,7 +118,7 @@ export default function StatementView({ endpoint, query = "", audience }: { endp
             </div>
           )}
           <p className="no-print" style={{ fontSize: 11, color: "var(--text-3)", marginTop: 12 }}>
-            Orders count in the period they were marked complete (Tulsa time). Amounts are White Glove Auto&apos;s price to the dealership; comebacks and warranty work aren&apos;t billed.
+            Orders count in the period they were invoiced (Tulsa time). Amounts are White Glove Auto&apos;s price to the dealership; comebacks and warranty work aren&apos;t billed.
           </p>
         </div>
       ) : null}

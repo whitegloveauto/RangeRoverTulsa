@@ -10,7 +10,7 @@ import { useIsPhone } from "@/lib/useIsPhone";
 function dueInfo(o: any): { label: string; cls: string } | null {
   if (!o.needed_by) return null;
   const d = Math.ceil((new Date(o.needed_by + "T00:00:00").getTime() - Date.now()) / 86400000);
-  const closed = o.status === "complete" || o.status === "cancelled";
+  const closed = o.status === "complete" || o.status === "cancelled" || o.status === "invoiced";
   const when = new Date(o.needed_by + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   if (closed) return { label: `Due ${when}`, cls: "due" };
   if (d < 0) return { label: `Overdue ${-d}d`, cls: "due urgent" };
@@ -25,9 +25,53 @@ const STATUSES = [
   ["in_shopmonkey", "In ShopMonkey"],
   ["scheduled", "Scheduled"],
   ["in_progress", "In progress"],
-  ["complete", "Complete"],
+  ["invoiced", "Invoiced"],
+  ["complete", "Paid · complete"],
   ["cancelled", "Cancelled"],
 ] as const;
+const nice = (ymd: string) => new Date(ymd + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const todayYmd = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+
+// Invoiced / paid line under the status pill: when it was invoiced and when to expect the money.
+function BillingNote({ o }: { o: any }) {
+  if (o.status === "invoiced" && o.invoiced_on) {
+    const late = o.payment_expected && o.payment_expected < todayYmd();
+    return (
+      <div className="bill-note">
+        Invoiced {nice(o.invoiced_on)}
+        {o.payment_label ? <div className={late ? "late" : ""}>{late ? `Payment late · was due ${nice(o.payment_expected)}` : o.payment_label}</div> : null}
+      </div>
+    );
+  }
+  if (o.status === "complete" && (o.paid_on || o.invoiced_on)) {
+    return <div className="bill-note">{o.invoiced_on ? `Invoiced ${nice(o.invoiced_on)}` : ""}{o.paid_on ? `${o.invoiced_on ? " · " : ""}Paid ${nice(o.paid_on)}` : ""}</div>;
+  }
+  return null;
+}
+
+// Invoice / paid buttons in an expanded order.
+function BillingActions({ o, onPatch }: { o: any; onPatch: (b: any) => Promise<void> }) {
+  const [date, setDate] = useState<string>(o.invoiced_on || todayYmd());
+  const working = ["new", "in_shopmonkey", "scheduled", "in_progress"].includes(o.status);
+  if (working) {
+    return (
+      <div className="bill-actions">
+        <div className="field"><label>Invoice date</label><input type="date" value={date} max={todayYmd()} onChange={(e) => setDate(e.target.value)} /></div>
+        <button className="btn-primary btn-sm" onClick={() => onPatch({ status: "invoiced", invoiced_on: date })}>Mark invoiced</button>
+      </div>
+    );
+  }
+  if (o.status === "invoiced") {
+    return (
+      <div className="bill-actions">
+        <div className="field"><label>Invoiced on</label><input type="date" defaultValue={o.invoiced_on || ""} max={todayYmd()} onBlur={(e) => e.target.value && e.target.value !== o.invoiced_on && onPatch({ invoiced_on: e.target.value })} /></div>
+        <span className="bill-exp">{o.payment_label || ""}</span>
+        <button className="btn-primary btn-sm" onClick={() => onPatch({ status: "complete" })}>Mark paid</button>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function WgaOrdersPage() {
   const { session, ready } = useWgaSession();
@@ -36,6 +80,7 @@ export default function WgaOrdersPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [info, setInfo] = useState("");
   const [sync, setSync] = useState<null | { busy?: boolean; res?: any; open?: boolean }>(null);
 
   async function syncNow() {
@@ -51,7 +96,7 @@ export default function WgaOrdersPage() {
     const r = await fetch("/api/wga/orders?status=" + (f === "open" ? "all" : f));
     if (!r.ok) return;
     const all = (await r.json()).orders || [];
-    setRows(f === "open" ? all.filter((o: any) => !["complete", "cancelled"].includes(o.status)) : all);
+    setRows(f === "open" ? all.filter((o: any) => !["invoiced", "complete", "cancelled"].includes(o.status)) : all);
   }
   useEffect(() => {
     if (ready) load(filter);
@@ -60,8 +105,11 @@ export default function WgaOrdersPage() {
 
   async function patch(id: string, body: any) {
     setMsg("");
+    setInfo("");
     const r = await fetch("/api/wga/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...body }) });
-    if (!r.ok) setMsg((await r.json()).error || "Update failed");
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) setMsg(d.error || "Update failed");
+    else if (d.message) setInfo(d.message);
     await load();
   }
 
@@ -75,16 +123,17 @@ export default function WgaOrdersPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">DEALER ORDERS</div>
             <div className="stage-title">Work coming in.</div>
-            <div className="stage-sub">Orders submitted from the dealership portal. Move each one through ShopMonkey → scheduled → complete. Trim is on every order so patterns get cut for the right variant.</div>
+            <div className="stage-sub">Orders submitted from the dealership portal. Move each one through ShopMonkey → scheduled → in progress → invoiced → paid. Paid orders land in Complete. Trim is on every order so patterns get cut for the right variant.</div>
           </div>
           <div className="tabs">
-            {[["open", "Open"], ["new", "New"], ["in_shopmonkey", "In ShopMonkey"], ["scheduled", "Scheduled"], ["in_progress", "In progress"], ["complete", "Complete"], ["all", "All"]].map(([k, l]) => (
+            {[["open", "Open"], ["new", "New"], ["in_shopmonkey", "In ShopMonkey"], ["scheduled", "Scheduled"], ["in_progress", "In progress"], ["invoiced", "Invoiced"], ["complete", "Complete"], ["all", "All"]].map(([k, l]) => (
               <button key={k} className={filter === k ? "active" : ""} onClick={() => setFilter(k)}>{l}</button>
             ))}
           </div>
           {msg ? <div className="notice warn">{msg}</div> : null}
+          {info ? <div className="notice ok">{info}</div> : null}
           <div className="sm-sync-bar">
-            <span>Statuses follow the ShopMonkey workflow automatically every 10 minutes (forward only — scheduled, in progress, complete). The dealership is emailed when an order moves.</span>
+            <span>Statuses follow the ShopMonkey workflow automatically every 10 minutes (forward only — scheduled, in progress, invoiced, paid). The dealership is emailed when an order moves; to them, invoiced means their car is done.</span>
             <button className="btn-ghost btn-sm" disabled={!!sync?.busy} onClick={syncNow}>{sync?.busy ? "Checking ShopMonkey…" : "Sync ShopMonkey now"}</button>
           </div>
           {sync?.res && sync.open ? (
@@ -151,7 +200,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
         <td>{o.dealer_dealerships?.name || "—"}<br /><span style={{ fontSize: 11 }}>{o.dealer_user_name || ""}</span></td>
         <td><b>{o.vehicle_year} {o.vehicle_model}</b><br /><span style={{ fontSize: 11, color: "var(--gold-bright)" }}>{o.vehicle_trim}</span>{o.vehicle_vin ? <div className="vin" style={{ fontSize: 11, color: "var(--text-3)" }}>…{o.vehicle_vin.slice(-8)}</div> : null}</td>
         <td>{lines.map((l) => l.name).join(", ")}</td>
-        <td><span className={"status-pill " + o.status}>{(STATUSES.find((s) => s[0] === o.status) || [o.status, o.status])[1]}</span>{o.scheduled_date ? <div style={{ fontSize: 11, marginTop: 4 }}>{o.scheduled_date}</div> : null}</td>
+        <td><span className={"status-pill " + o.status}>{(STATUSES.find((s) => s[0] === o.status) || [o.status, o.status])[1]}</span>{o.scheduled_date && !["invoiced", "complete"].includes(o.status) ? <div style={{ fontSize: 11, marginTop: 4 }}>{o.scheduled_date}</div> : null}<BillingNote o={o} /></td>
         <td>{o.assigned_name || "—"}</td>
         <td className="num"><b>{money(o.cost_total)}</b></td>
         <td className="num">{money(o.retail_total)}</td>
@@ -173,7 +222,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
               {o.available_from || o.needed_by ? <span>Window <b>{o.available_from || "any"} → {o.needed_by || "no deadline"}</b></span> : null}
               {o.vehicle_vin ? <span>VIN <b className="vin">{o.vehicle_vin}</b></span> : null}
               {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
-              {o.sm_order_number ? <span>ShopMonkey <b>RO {o.sm_order_number}</b>{o.sm_synced_at ? ` · ${new Date(o.sm_synced_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span> : null}
+              {o.sm_order_number ? <span onClick={(e) => e.stopPropagation()}>ShopMonkey <b>RO {o.sm_order_number}</b>{o.sm_synced_at ? ` · ${new Date(o.sm_synced_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""} <button className="link-btn" title="Writes this order number into the vehicle's Unit field in ShopMonkey" onClick={() => onPatch({ action: "sm_unit" })}>Put {o.quote_number} in Unit</button></span> : null}
               {!o.sm_order_number ? (
                 <span onClick={(e) => e.stopPropagation()}>
                   ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b>{" "}
@@ -181,6 +230,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
                 </span>
               ) : null}
             </div>
+            <div onClick={(e) => e.stopPropagation()}><BillingActions o={o} onPatch={onPatch} /></div>
             <div className="detail-actions" onClick={(e) => e.stopPropagation()}>
               <div className="field"><label>Status</label>
                 <select value={o.status} onChange={(e) => onPatch({ status: e.target.value })}>
@@ -210,6 +260,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
           <span className="oc-num">{o.sm_order_number ? <b style={{ color: "var(--gold-bright)" }}>RO {o.sm_order_number}</b> : o.sm_sync_error ? <span style={{ color: "#e06b6b" }}>SM failed</span> : "no RO"}</span>
         </div>
         {(() => { const d = dueInfo(o); return d ? <div style={{ marginBottom: 8 }}><span className={"status-pill " + d.cls}>{d.label}</span>{o.available_from ? <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: 10 }}>available {new Date(o.available_from + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span> : null}</div> : null; })()}
+        <BillingNote o={o} />
         <div className="oc-vehicle">{o.vehicle_year} {o.vehicle_model} <span>{o.vehicle_trim}</span></div>
         <div className="oc-services">{lines.map((l) => l.name).join(" · ") || "—"}</div>
         <div className="oc-meta">
@@ -246,6 +297,7 @@ function OrderCard({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTo
               <span>ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b></span>
             )}
           </div>
+          <BillingActions o={o} onPatch={onPatch} />
           <div className="oc-actions">
             {!o.sm_order_number ? <button className="btn-primary btn-sm" onClick={() => onPatch({ action: "shopmonkey" })}>Create RO in ShopMonkey</button> : null}
             <div className="field"><label>Status</label>

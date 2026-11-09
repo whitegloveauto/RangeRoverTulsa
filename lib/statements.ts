@@ -3,14 +3,16 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { addDays, getBillingTerms, localDate, localMidnightUtc, periodFor, recentPeriods, termsLabel } from "@/lib/billing";
 export { localDate } from "@/lib/billing";
 
-// Billing statement for a dealership: every order completed in the period (Tulsa time), billed
-// at WGA cost. The period and due date follow the dealership's payment schedule (weekly on a pay
-// day, every 2 weeks, monthly on receipt, or monthly Net N). Completion date = the most recent
-// "→ complete" event on the order (falls back to when its status last changed).
+// Billing statement for a dealership: every order INVOICED in the period (Tulsa time), billed at
+// WGA cost. The period and due date follow the dealership's payment schedule (weekly: work invoiced
+// Mon–Sun is paid on the pay day the following week; every 2 weeks; monthly on receipt or Net N).
+// Invoice date = the most recent "→ invoiced" event; orders marked paid ("complete") without one
+// (older orders) use when they were completed. `paid` = the order has been marked paid.
 
 export interface StatementLine {
   id: string;
-  completed: string; // YYYY-MM-DD (Tulsa)
+  completed: string; // invoice date, YYYY-MM-DD (Tulsa)
+  paid: boolean;
   quote_number: string;
   ro: string;
   vin: string;
@@ -32,29 +34,34 @@ export async function buildStatement(dealershipId: string, periodKey: string | n
   // Candidates: completed orders whose status changed on/after the month start (completion can't be later than that).
   const { data: qs } = await supabaseAdmin
     .from("dealer_quotes")
-    .select("id, quote_number, sm_order_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at")
+    .select("id, quote_number, status, sm_order_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at")
     .eq("dealership_id", dealershipId)
-    .eq("status", "complete")
+    .in("status", ["invoiced", "complete"])
     .gte("status_updated_at", new Date(start - 86400000).toISOString())
     .order("status_updated_at", { ascending: true })
     .limit(1000);
 
   const ids = (qs || []).map((q) => q.id);
+  const invAt: Record<string, string> = {};
   const doneAt: Record<string, string> = {};
   for (let i = 0; i < ids.length; i += 150) {
-    const { data: ev } = await supabaseAdmin.from("dealer_order_events").select("quote_id, created_at").in("quote_id", ids.slice(i, i + 150)).eq("to_status", "complete");
-    for (const e of ev || []) if (!doneAt[e.quote_id] || e.created_at > doneAt[e.quote_id]) doneAt[e.quote_id] = e.created_at;
+    const { data: ev } = await supabaseAdmin.from("dealer_order_events").select("quote_id, created_at, to_status").in("quote_id", ids.slice(i, i + 150)).in("to_status", ["invoiced", "complete"]);
+    for (const e of ev || []) {
+      const m = e.to_status === "invoiced" ? invAt : doneAt;
+      if (!m[e.quote_id] || e.created_at > m[e.quote_id]) m[e.quote_id] = e.created_at;
+    }
   }
 
   const lines: StatementLine[] = [];
   for (const q of qs || []) {
-    const at = doneAt[q.id] || q.status_updated_at || q.submitted_at;
+    const at = invAt[q.id] || doneAt[q.id] || q.status_updated_at || q.submitted_at;
     if (!at) continue;
     const t = new Date(at).getTime();
     if (t < start || t >= end) continue;
     lines.push({
       id: q.id,
       completed: localDate(at),
+      paid: q.status === "complete",
       quote_number: q.quote_number || "",
       ro: q.sm_order_number || "",
       vin: q.vehicle_vin || "",
@@ -81,6 +88,7 @@ export async function buildStatement(dealershipId: string, periodKey: string | n
     dueLabel: period.dueLabel,
     count: lines.length,
     total: lines.reduce((s, l) => s + l.amount, 0),
+    paidTotal: lines.filter((l) => l.paid).reduce((s, l) => s + l.amount, 0),
     retailTotal: lines.reduce((s, l) => s + l.retail, 0),
     lines,
   };
@@ -94,9 +102,9 @@ const cell = (v: unknown) => {
 };
 
 export function statementCsv(st: Statement, includeRetail: boolean): string {
-  const head = ["Completed", "Order #", "RO #", "VIN", "Vehicle", "Services", "Placed by", "Amount (WGA)", ...(includeRetail ? ["Your retail"] : [])];
-  const rows = st.lines.map((l) => [l.completed, l.quote_number, l.ro, l.vin, l.vehicle, l.services, l.placed_by, l.amount.toFixed(2), ...(includeRetail ? [l.retail.toFixed(2)] : [])]);
-  const foot = [["", "", "", "", "", "", `TOTAL (${st.count} orders) · ${st.terms} · ${st.dueLabel}`, st.total.toFixed(2), ...(includeRetail ? [st.retailTotal.toFixed(2)] : [])]];
+  const head = ["Invoiced", "Order #", "RO #", "VIN", "Vehicle", "Services", "Placed by", "Paid", "Amount (WGA)", ...(includeRetail ? ["Your retail"] : [])];
+  const rows = st.lines.map((l) => [l.completed, l.quote_number, l.ro, l.vin, l.vehicle, l.services, l.placed_by, l.paid ? "Yes" : "", l.amount.toFixed(2), ...(includeRetail ? [l.retail.toFixed(2)] : [])]);
+  const foot = [["", "", "", "", "", "", `TOTAL (${st.count} orders) · ${st.terms} · ${st.dueLabel}`, "", st.total.toFixed(2), ...(includeRetail ? [st.retailTotal.toFixed(2)] : [])]];
   return [head, ...rows, ...foot].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
 

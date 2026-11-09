@@ -13,6 +13,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--gold) !important
 .status-pill.in_shopmonkey { color: #A7ADB5; border-color: #3A3F45; }
 .status-pill.scheduled { color: #BFE0F5; border-color: #5F93B4; }
 .status-pill.in_progress { color: #F3C969; border-color: #6E5A2A; }
+.status-pill.invoiced { color: #9FE0B4; border-color: #3E7353; }
 `;
 
 // White Glove Auto's own look for the admin side (off-black / white / baby blue).

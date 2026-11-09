@@ -43,6 +43,7 @@ export const DEALER_STATUS_LABEL: Record<string, string> = {
   in_shopmonkey: "Received",
   scheduled: "Scheduled",
   in_progress: "In the shop",
+  invoiced: "Complete",
   complete: "Complete",
   cancelled: "Cancelled",
 };
