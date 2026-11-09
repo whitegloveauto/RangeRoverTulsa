@@ -1,0 +1,16 @@
+{
+  "name": "White Glove Auto — Dealer Program Admin",
+  "short_name": "WGA Admin",
+  "description": "White Glove Auto's side of the dealer program: orders, comebacks, pricing, statements.",
+  "start_url": "/wga?source=pwa",
+  "scope": "/wga",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#141517",
+  "theme_color": "#141517",
+  "icons": [
+    { "src": "/wga-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/wga-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/wga-icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

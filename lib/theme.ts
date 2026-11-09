@@ -20,8 +20,18 @@ export const WGA_THEME: BrandTheme = {
 };
 
 // CSS custom properties for a theme (names match globals.css).
+const rgb = (hex: string) => {
+  const h = hex.replace("#", "");
+  const f = h.length === 3 ? h.split("").map((c) => c + c).join("") : h.slice(0, 6);
+  return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16) || 0).join(",");
+};
+
+// If the web font hasn't loaded (or fails), fall back to the same kind of face: serif brands stay serif, sans stay sans.
+const displayFallback = (font: string) =>
+  /garamond|playfair|baskerville|bodoni|didot|georgia|lora|merriweather|crimson|cormorant|serif/i.test(font) && !/sans/i.test(font) ? "Georgia,serif" : "system-ui,-apple-system,'Helvetica Neue',sans-serif";
+
 export function themeCss(t: BrandTheme): string {
-  return `:root{--bg:${t.bg};--surface:${t.surface};--surface-2:${t.surface2};--surface-hi:${t.surfaceHi};--stroke:${t.stroke};--stroke-soft:${t.strokeSoft};--text:${t.text};--text-2:${t.text2};--text-3:${t.text3};--gold:${t.accent};--gold-bright:${t.accentBright};--gold-dim:${t.accentDim};--warn:${t.warn};--font-display:'${t.displayFont}',Georgia,serif;--font-body:'${t.bodyFont}',system-ui,sans-serif;--paper-ink:${t.paperInk};--paper-accent:${t.paperAccent};}`;
+  return `:root{--gold-rgb:${rgb(t.accent)};--bg-rgb:${rgb(t.bg)};--surface-rgb:${rgb(t.surface)};--bg:${t.bg};--surface:${t.surface};--surface-2:${t.surface2};--surface-hi:${t.surfaceHi};--stroke:${t.stroke};--stroke-soft:${t.strokeSoft};--text:${t.text};--text-2:${t.text2};--text-3:${t.text3};--gold:${t.accent};--gold-bright:${t.accentBright};--gold-dim:${t.accentDim};--warn:${t.warn};--font-display:'${t.displayFont}',${displayFallback(t.displayFont)};--font-body:'${t.bodyFont}',system-ui,sans-serif;--paper-ink:${t.paperInk};--paper-accent:${t.paperAccent};}`;
 }
 
 export function fontHref(t: BrandTheme): string {

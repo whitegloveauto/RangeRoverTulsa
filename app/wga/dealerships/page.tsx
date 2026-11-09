@@ -169,7 +169,7 @@ export default function WgaDealershipsPage() {
             {brands.map((b) => (
               <div key={b.key} className="card" style={{ margin: 0, cursor: "pointer" }} onClick={() => setModal({ kind: "brand", brand: b })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 56, height: 40, background: b.theme?.bg || "#111", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${b.theme?.stroke || "#333"}` }}>
+                  <div data-theme-exempt style={{ width: 56, height: 40, background: b.theme?.bg || "#111", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${b.theme?.stroke || "#333"}` }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={b.logo_light_url} alt={b.name} style={{ maxHeight: 28, maxWidth: 48, objectFit: "contain" }} />
                   </div>
@@ -179,7 +179,7 @@ export default function WgaDealershipsPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 4, marginTop: 10 }}>
-                  {["bg", "surface", "accent", "accentBright", "text"].map((k) => <span key={k} title={k} style={{ width: 22, height: 14, background: b.theme?.[k] || "#000", border: "1px solid rgba(255,255,255,0.15)" }} />)}
+                  {["bg", "surface", "accent", "accentBright", "text"].map((k) => <span key={k} title={k} data-theme-exempt style={{ width: 22, height: 14, background: b.theme?.[k] || "#000", border: "1px solid rgba(255,255,255,0.15)" }} />)}
                 </div>
               </div>
             ))}
@@ -333,7 +333,7 @@ function BrandModal({ onClose, brand, brands, reload }: { onClose: () => void; b
           {brand ? (
             <div className="field" style={{ gridColumn: "1 / -1" }}><label>Badge / logo</label>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ background: f.theme.bg || "#111", padding: 8, border: "1px solid var(--stroke)" }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={brand.logo_light_url} alt="" style={{ height: 32, maxWidth: 120, objectFit: "contain" }} /></div>
+                <div data-theme-exempt style={{ background: f.theme.bg || "#111", padding: 8, border: "1px solid var(--stroke)" }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={brand.logo_light_url} alt="" style={{ height: 32, maxWidth: 120, objectFit: "contain" }} /></div>
                 <label className="btn-ghost btn-sm" style={{ cursor: "pointer" }}>Upload badge<input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>
               </div>
             </div>
