@@ -134,8 +134,6 @@ function QuoteSheetInner() {
   const [dealership, setDealership] = useState<{ name: string } | null>(null);
   const [brand, setBrand] = useState<{ name: string; logo_url: string } | null>(null);
   const [doc, setDoc] = useState<PacketData | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -149,7 +147,6 @@ function QuoteSheetInner() {
     const [data, pk] = await Promise.all([res.json(), fetch(`/api/quotes/${params.id}/packet`).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
     if (pk?.data) {
       setDoc(pk.data);
-      setShareUrl(pk.shareUrl || null);
     }
     setQuote(data.quote);
     setEvents(data.events || []);
@@ -184,16 +181,6 @@ function QuoteSheetInner() {
         </main>
       </div>
     );
-  }
-
-  const shareMsg = `Here's the XPEL protection quote for your ${quote.vehicle_year} ${quote.vehicle_model}: ${shareUrl}`;
-  async function copyLink() {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {}
   }
 
   return (
@@ -231,12 +218,6 @@ function QuoteSheetInner() {
             <button className="btn-primary" onClick={() => window.print()}>
               Print / Save PDF
             </button>
-            {shareUrl ? (
-              <>
-                <a className="btn-ghost" style={{ textDecoration: "none" }} href={`sms:?&body=${encodeURIComponent(shareMsg)}`}>Text to customer</a>
-                <button className="btn-ghost" onClick={copyLink}>{copied ? "Link copied ✓" : "Copy customer link"}</button>
-              </>
-            ) : null}
           </div>
         </div>
 
