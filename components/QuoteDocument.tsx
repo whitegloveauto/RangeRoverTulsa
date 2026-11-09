@@ -11,21 +11,27 @@ export const QUOTE_DOC_CSS = `
   .qdoc { width: 100%; max-width: 780px; margin: 0 auto; background: #fff; color: #1A1A1A; padding: 56px 56px 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); font-family: 'Inter', system-ui, sans-serif; }
   .qdoc .serif { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; }
   .qdoc .eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: ${C.gold}; }
-  .qdoc .svc { margin-top: 26px; break-inside: avoid; page-break-inside: avoid; }
-  .qdoc .svc-head { padding-bottom: 8px; border-bottom: 1px solid ${C.rule}; }
-  .qdoc .facts { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
-  .qdoc .facts li { position: relative; padding-left: 14px; font-size: 11.5px; line-height: 1.5; color: ${C.text}; }
-  .qdoc .facts li::before { content: ""; position: absolute; left: 0; top: 6px; width: 5px; height: 5px; background: ${C.accent}; transform: rotate(45deg); }
-  .qdoc .line { padding: 10px 0; border-bottom: 1px solid #EEEAE1; }
-  .qdoc .line:last-child { border-bottom: 0; }
-  .qdoc .line-top { display: flex; justify-content: space-between; gap: 16px; font-size: 13.5px; color: ${C.text}; }
-  .qdoc .includes { font-size: 11.5px; color: ${C.muted}; line-height: 1.55; margin-top: 4px; max-width: 580px; }
+  /* qd-* names on purpose: the app's own .svc-head etc. must never restyle this document */
+  .qdoc .qd-svc { margin-top: 30px; break-inside: avoid; page-break-inside: avoid; }
+  .qdoc .qd-head { display: block; padding: 0 0 12px; border-bottom: 1px solid ${C.rule}; }
+  .qdoc .qd-svc-name { font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: ${C.gold}; font-weight: 600; }
+  .qdoc .qd-product { font-size: 22px; color: ${C.ink}; margin-top: 2px; line-height: 1.2; }
+  .qdoc .qd-pitch { font-size: 12px; line-height: 1.65; color: ${C.text}; margin: 8px 0 0; }
+  .qdoc .qd-facts { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 28px; }
+  .qdoc .qd-facts li { position: relative; padding-left: 14px; font-size: 11px; line-height: 1.5; color: ${C.text}; }
+  .qdoc .qd-facts li::before { content: ""; position: absolute; left: 0; top: 6px; width: 5px; height: 5px; background: ${C.accent}; transform: rotate(45deg); }
+  .qdoc .qd-line { padding: 12px 0; border-bottom: 1px solid #EEEAE1; }
+  .qdoc .qd-line:last-child { border-bottom: 0; }
+  .qdoc .qd-line-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 14px; color: ${C.text}; }
+  .qdoc .qd-includes { font-size: 11.5px; color: ${C.muted}; line-height: 1.55; margin-top: 4px; max-width: 600px; }
   @media (max-width: 720px) {
+    .qdoc .qd-facts { grid-template-columns: 1fr; }
     .qdoc { padding: 28px 20px 24px; }
     .qdoc .head { flex-direction: column; align-items: flex-start !important; gap: 14px; }
     .qdoc .head .right { text-align: left !important; }
   }
   @media print {
+    html, body, .frame, main { background: #fff !important; }
     .qdoc { box-shadow: none !important; margin: 0 !important; max-width: 100% !important; padding: 0 !important; }
   }
 `;
@@ -89,21 +95,21 @@ export default function QuoteDocument({ data, status }: { data: PacketData; stat
 
       {/* Services: product, the pitch, key facts, then each package with what it includes */}
       {sections.map(({ svc, name, lines: ls }) => (
-        <div key={name} className="svc">
-          <div className="svc-head">
-            <div style={{ fontSize: 11, letterSpacing: "0.2em", color: C.ink, fontWeight: 700, textTransform: "uppercase" }}>{name}</div>
-            {svc?.product_name && svc.product_name !== name ? <div className="serif" style={{ fontSize: 20, color: C.ink, marginTop: 2 }}>{svc.product_name}</div> : null}
-            {svc?.blurb ? <p style={{ fontSize: 11.5, lineHeight: 1.65, color: C.text, margin: "6px 0 0" }}>{svc.blurb}</p> : null}
-            {svc?.facts?.length ? <ul className="facts">{svc.facts.map((f, i) => <li key={i}>{f}</li>)}</ul> : null}
+        <div key={name} className="qd-svc">
+          <div className="qd-head">
+            <div className="qd-svc-name">{name.replace(/\s+/g, " ")}</div>
+            {svc?.product_name && svc.product_name.toLowerCase() !== name.toLowerCase() ? <div className="serif qd-product">{svc.product_name}</div> : null}
+            {svc?.blurb ? <p className="qd-pitch">{svc.blurb}</p> : null}
+            {svc?.facts?.length ? <ul className="qd-facts">{svc.facts.map((f, i) => <li key={i}>{f}</li>)}</ul> : null}
           </div>
           {ls.map((l) => (
-            <div key={l.item_id} className="line">
-              <div className="line-top">
+            <div key={l.item_id} className="qd-line">
+              <div className="qd-line-top">
                 <span style={{ fontWeight: 600, color: C.ink }}>{l.name}</span>
-                <span style={{ color: C.ink }}>{money(l.retail)}</span>
+                <span style={{ color: C.ink, whiteSpace: "nowrap" }}>{money(l.retail)}</span>
               </div>
-              {l.coverage ? <div className="includes">Includes: {l.coverage}</div> : null}
-              {l.blurb ? <div className="includes" style={{ fontStyle: "italic" }}>{l.blurb}</div> : null}
+              {l.coverage ? <div className="qd-includes">Includes: {l.coverage}</div> : null}
+              {l.blurb ? <div className="qd-includes" style={{ fontStyle: "italic" }}>{l.blurb}</div> : null}
             </div>
           ))}
         </div>
