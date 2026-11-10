@@ -36,6 +36,27 @@ export async function createSession(claims: SessionClaims): Promise<string> {
     .sign(getSecret());
 }
 
+// View-as hand-off: WGA staff on the White Glove address open a dealership's own address already
+// signed in as that dealership. A 60-second token carries the session across; the dealership's
+// site trades it for its own cookie (/api/auth/handoff).
+export async function createHandoff(claims: SessionClaims): Promise<string> {
+  return await new SignJWT({ ...claims, purpose: "view-as-handoff" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("60s")
+    .sign(getSecret());
+}
+
+export async function readHandoff(token: string): Promise<SessionClaims | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if (payload.purpose !== "view-as-handoff" || payload.kind !== "dealer" || !payload.viewAs) return null;
+    return verifySession(token);
+  } catch {
+    return null;
+  }
+}
+
 export async function verifySession(token: string): Promise<SessionClaims | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
