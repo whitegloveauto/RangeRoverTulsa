@@ -128,7 +128,7 @@ export default function PricingPage() {
   async function save(submit: boolean, confirmDuplicate = false) {
     if (!vehicle || !selected.size) return;
     if (submit && !vinOk) {
-      setMsg({ text: vin ? `That VIN has ${vin.length} characters — it needs 17 (no I, O or Q).` : "Enter the VIN to submit the order.", err: true });
+      setMsg({ text: !vin ? "Enter the VIN to submit the order." : vin.length !== 17 ? `That VIN has ${vin.length} characters — it needs 17.` : "That VIN has an I, O or Q in it — VINs never use those letters.", err: true });
       document.getElementById("vin")?.focus();
       return;
     }

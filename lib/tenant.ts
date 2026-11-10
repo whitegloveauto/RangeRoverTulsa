@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { cache } from "react";
 import { supabaseAdmin } from "@/lib/supabase";
 import { DEFAULT_THEME, type BrandTheme } from "@/lib/theme";
 import { brandLogos } from "@/lib/brandLogo";
@@ -41,8 +42,25 @@ export async function tenantByDealershipId(id: string): Promise<Tenant | null> {
   return build(d, await brandFor(d.brand_key));
 }
 
-export async function tenantByHost(host: string | null): Promise<Tenant | null> {
-  const h = (host || "").toLowerCase().split(":")[0];
+// Every page asks for the tenant several times (metadata, viewport, layout). Dedupe within a request
+// (React cache) and keep it for a minute on a warm server, so a page load isn't 6+ database trips.
+const TENANT_TTL = 60_000;
+const tenantMemo = new Map<string, { at: number; t: Promise<Tenant | null> }>();
+
+export const tenantByHost = cache(async (host: string | null): Promise<Tenant | null> => {
+  const key = (host || "").toLowerCase().split(":")[0];
+  const hit = tenantMemo.get(key);
+  if (hit && Date.now() - hit.at < TENANT_TTL) return hit.t;
+  const t = loadTenantByHost(key).catch((e) => {
+    tenantMemo.delete(key);
+    throw e;
+  });
+  tenantMemo.set(key, { at: Date.now(), t });
+  return t;
+});
+
+async function loadTenantByHost(host: string): Promise<Tenant | null> {
+  const h = host;
   let d: any = null;
   if (h) {
     const r = await supabaseAdmin.from("dealer_dealerships").select(SELECT).contains("hostnames", [h]).eq("active", true).maybeSingle();

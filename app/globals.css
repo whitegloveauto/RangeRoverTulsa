@@ -659,7 +659,7 @@ header.app.wga .nav-links a.active { color: var(--gold-bright); }
 
 /* statements */
 .stmt-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
-.stmt-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.stmt-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .stmt-controls .field { min-width: 150px; }
 .stmt-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 18px; }
 .stmt-totals > div { border: 1px solid var(--stroke); background: var(--surface); padding: 14px 16px; }

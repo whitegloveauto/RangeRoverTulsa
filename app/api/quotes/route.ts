@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   if (submit && !VIN_RE.test(vinNorm)) {
     return NextResponse.json({ error: "Enter the full 17-character VIN to submit the order." }, { status: 400 });
   }
-  if (vinNorm && vinNorm.length !== 17) return NextResponse.json({ error: "VIN needs 17 characters." }, { status: 400 });
+  if (vinNorm && !VIN_RE.test(vinNorm)) return NextResponse.json({ error: vinNorm.length !== 17 ? "VIN needs 17 characters." : "That VIN isn't valid — VINs never use the letters I, O or Q." }, { status: 400 });
 
   // Editing a saved quote?
   let existing: any = null;

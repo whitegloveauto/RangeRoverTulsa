@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getSession } from "@/lib/session";
 import type { VehicleCatalog } from "@/lib/types";
 import { getHiddenVehicles } from "@/lib/dealerCatalog";
+import { trimOrder } from "@/lib/trims";
 
 export const runtime = "nodejs";
 
@@ -40,6 +41,9 @@ export async function GET() {
       byYear[row.year][row.model].push(row.trim);
     }
   }
+
+  // Trims often share one sort_order — put them in the order a salesperson expects (S → SE → HSE …).
+  for (const y of Object.keys(byYear)) for (const m of Object.keys(byYear[Number(y)])) byYear[Number(y)][m].sort(trimOrder);
 
   const catalog: VehicleCatalog = {
     years: Array.from(yearsSet).sort((a, b) => b - a),

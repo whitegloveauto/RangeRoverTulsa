@@ -55,7 +55,7 @@ function SubmitSavedQuote({ id, quote, onDone }: { id: string; quote: QuoteData;
 
   async function submit(opts: { confirmDuplicate?: boolean; confirmPrice?: boolean } = {}) {
     if (!vinOk) {
-      setErr(vin ? `That VIN has ${vin.length} characters — it needs 17 (no I, O or Q).` : "Enter the VIN to submit the order.");
+      setErr(!vin ? "Enter the VIN to submit the order." : vin.length !== 17 ? `That VIN has ${vin.length} characters — it needs 17.` : "That VIN has an I, O or Q in it — VINs never use those letters.");
       document.getElementById("sq-vin")?.focus();
       return;
     }
