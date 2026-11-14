@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm } from "@/lib/session";
 import { selectedDealership } from "@/lib/wgaContext";
 import { getHiddenVehicles, setHiddenVehicles } from "@/lib/dealerCatalog";
+import { factoryCatalog } from "@/lib/factoryCatalog";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,12 @@ export async function GET() {
     dealership: dealer ? { id: dealer.id, name: dealer.name, short_name: (dealer as any).short_name || dealer.name, brand: BRAND } : null,
     sharedWith: (siblings || []).filter((x) => x.id !== dealer?.id).map((x) => x.short_name || x.name),
     vehicles: (data || []).map((r) => ({ ...r, offered: r.active && !hidden.has(r.id) })),
+    factory: (() => {
+      const f = factoryCatalog(BRAND);
+      if (!f) return null;
+      const have = new Set((data || []).map((r) => `${r.year}|${r.model}|${r.trim}`));
+      return { label: f.label, total: f.rows.length, missing: f.rows.filter((r) => !have.has(`${r.year}|${r.model}|${r.trim}`)).length };
+    })(),
   });
 }
 
@@ -85,6 +92,19 @@ export async function POST(req: Request) {
       const { error } = await supabaseAdmin.from("dealer_vehicles").delete().eq("id", b.id);
       if (error) return fail("Could not delete trim.");
       return NextResponse.json({ ok: true });
+    }
+    // catalog.loadFactory — add every 2020–2027 factory model/trim for this brand that isn't in the catalog yet
+    case "catalog.loadFactory": {
+      const f = factoryCatalog(BRAND);
+      if (!f) return fail(`There's no built-in lineup for ${BRAND} yet.`, 400);
+      const { data: existing } = await supabaseAdmin.from("dealer_vehicles").select("year, model, trim").eq("brand", BRAND).limit(20000);
+      const have = new Set((existing || []).map((r) => `${r.year}|${r.model}|${r.trim}`));
+      const rows = f.rows.filter((r) => !have.has(`${r.year}|${r.model}|${r.trim}`)).map((r) => ({ brand: BRAND, ...r, active: true }));
+      for (let i = 0; i < rows.length; i += 400) {
+        const { error } = await supabaseAdmin.from("dealer_vehicles").insert(rows.slice(i, i + 400));
+        if (error) return fail(`Could not load the lineup (${i} of ${rows.length} added).`);
+      }
+      return NextResponse.json({ ok: true, added: rows.length });
     }
     case "model.copyYear": {
       const fromYear = Number(b.fromYear);

@@ -43,6 +43,9 @@ export async function POST(req: Request) {
   const here = hostOf(req.headers.get("x-forwarded-host") || req.headers.get("host"));
   const site = ((d.hostnames as string[] | null) || []).map(hostOf).find((h) => h && !isLocalHost(h));
   if (site && site !== here && !isLocalHost(here)) {
+    // The dealership's address has to be live (added in Netlify + DNS) before we can send anyone there.
+    const live = await fetch(`https://${site}/dealer-manifest`, { signal: AbortSignal.timeout(3500), redirect: "manual" }).then((r) => r.ok, () => false);
+    if (!live) return NextResponse.json({ error: `${site} isn't live yet. Add it to the site in Netlify (Domain management → Add a domain alias) and in Cloudflare DNS (CNAME → rangerovertulsa.netlify.app, DNS only), then try again.` }, { status: 409 });
     const t = await createHandoff(claims);
     return NextResponse.json({ ok: true, next: `https://${site}/api/auth/handoff?t=${encodeURIComponent(t)}`, dealership: d.name, role });
   }
