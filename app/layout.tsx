@@ -6,6 +6,19 @@ import { headers } from "next/headers";
 import ThemeStyle from "@/components/ThemeStyle";
 import { dealerAppName, dealerIcons } from "@/lib/dealerIcons";
 
+// Absolute address of this site, so link previews (texts, email, Slack) can load the picture.
+const siteOrigin = () => {
+  const h = (headers().get("x-forwarded-host") || headers().get("host") || "").split(",")[0].trim();
+  return h ? `${/^(localhost|127\.)/.test(h) ? "http" : "https"}://${h}` : "https://dealers.whitegloveauto.app";
+};
+const preview = (title: string, description: string, image: string) => {
+  const url = `${siteOrigin()}${image}`;
+  return {
+    openGraph: { type: "website" as const, title, description, siteName: title, images: [{ url, width: 1200, height: 630, alt: title }] },
+    twitter: { card: "summary_large_image" as const, title, description, images: [url] },
+  };
+};
+
 const isWgaPath = () => {
   const path = headers().get("x-pathname") || "";
   return path === "/wga" || path.startsWith("/wga/");
@@ -26,6 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
       },
       appleWebApp: { capable: true, title: "WGA Admin", statusBarStyle: "black-translucent" },
       formatDetection: { telephone: false },
+      ...preview("White Glove Auto · Dealer Program", "Dealer pricing, quotes and orders.", "/brand-og/wga.png"),
     };
   }
   const tenant = await currentTenant().catch(() => null);
@@ -42,6 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     appleWebApp: { capable: true, title: name.length > 14 ? "Dealer Portal" : name, statusBarStyle: "black-translucent" },
     formatDetection: { telephone: false },
+    ...preview(`${name} · Dealer Portal`, "Protection pricing, quotes and orders.", ic.og),
   };
 }
 
