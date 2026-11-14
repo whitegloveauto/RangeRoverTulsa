@@ -53,21 +53,32 @@ const MERCEDES: Lineup = {
 };
 
 const PORSCHE: Lineup = {
-  "718 Boxster": ["Boxster:2020-2025", "Boxster T:2020-2023", "Boxster S:2020-2025", "Boxster GTS 4.0:2021-2025", "Spyder:2020-2023", "Boxster 25 Years:2021", "Boxster Style Edition:2023-2025", "Spyder RS:2024-2025"],
-  "718 Cayman": ["Cayman:2020-2025", "Cayman T:2020-2023", "Cayman S:2020-2025", "Cayman GTS 4.0:2021-2025", "Cayman GT4:2020-2023", "Cayman Style Edition:2023-2025", "Cayman GT4 RS:2022-2025"],
+  "718 Boxster": ["Boxster:2020-2025", "Boxster T:2020-2023", "Boxster S:2020-2025", "Boxster GTS 4.0:2021-2025", "Boxster 25 Years:2021", "Boxster Style Edition:2023-2025"],
+  "718 Spyder": ["Spyder:2020-2023"],
+  "718 Spyder RS": ["Spyder RS:2024-2025"],
+  "718 Cayman": ["Cayman:2020-2025", "Cayman T:2020-2023", "Cayman S:2020-2025", "Cayman GTS 4.0:2021-2025", "Cayman Style Edition:2023-2025"],
+  "718 Cayman GT4": ["GT4:2020-2023"],
+  "718 Cayman GT4 RS": ["GT4 RS:2022-2025"],
   "911": [
     "Carrera:2020-", "Carrera T:2023-", "Carrera S:2020-2024", "Carrera S:2026-", "Carrera 4:2020-2024", "Carrera 4S:2020-2024", "Carrera 4S:2026-",
-    "Carrera GTS:2022-", "Carrera 4 GTS:2022-", "Turbo:2021-2024", "Turbo S:2021-2024", "Turbo S:2026-",
-    "GT3:2022-", "GT3 Touring:2022-", "GT3 RS:2023-2025", "S/T:2024", "Sport Classic:2023", "Dakar:2023-2024", "Turbo 50 Years:2025", "Spirit 70:2026",
+    "Carrera GTS:2022-", "Carrera 4 GTS:2022-", "Spirit 70:2026",
   ],
-  "911 Cabriolet": ["Carrera:2020-", "Carrera T:2025-", "Carrera S:2020-2024", "Carrera S:2026-", "Carrera 4:2020-2024", "Carrera 4S:2020-2024", "Carrera 4S:2026-", "Carrera GTS:2022-", "Carrera 4 GTS:2022-", "Turbo:2021-2024", "Turbo S:2021-2024", "Turbo S:2026-"],
+  "911 Cabriolet": ["Carrera:2020-", "Carrera T:2025-", "Carrera S:2020-2024", "Carrera S:2026-", "Carrera 4:2020-2024", "Carrera 4S:2020-2024", "Carrera 4S:2026-", "Carrera GTS:2022-", "Carrera 4 GTS:2022-"],
   "911 Targa": ["Targa 4:2021-2024", "Targa 4S:2021-2024", "Targa 4S:2026-", "Targa 4 GTS:2022-", "Targa 4S Heritage Design Edition:2021"],
+  "911 Turbo": ["Turbo:2021-2024", "Turbo S:2021-2024", "Turbo S:2026-", "Turbo 50 Years:2025"],
+  "911 Turbo Cabriolet": ["Turbo Cabriolet:2021-2024", "Turbo S Cabriolet:2021-2024", "Turbo S Cabriolet:2026-"],
+  "911 GT3": ["GT3:2022-", "GT3 Touring:2022-"],
+  "911 GT3 RS": ["GT3 RS:2023-2026"],
+  "911 S/T": ["S/T:2024"],
+  "911 Sport Classic": ["Sport Classic:2023"],
+  "911 Dakar": ["Dakar:2023-2024"],
   "Panamera": [
     "Panamera:2020-", "Panamera 4:2020-", "Panamera 4S:2020-2023", "Panamera GTS:2020-2023", "Panamera GTS:2025-", "Panamera Turbo:2020", "Panamera Turbo S:2021-2023",
     "Panamera 4 E-Hybrid:2020-2023", "Panamera 4 E-Hybrid:2025-", "Panamera 4S E-Hybrid:2021-", "Panamera Turbo E-Hybrid:2024-", "Panamera Turbo S E-Hybrid:2020-2023", "Panamera Turbo S E-Hybrid:2025-",
   ],
   "Panamera Sport Turismo": ["Panamera 4:2020-2023", "Panamera 4S:2020-2023", "Panamera GTS:2020-2023", "Panamera Turbo:2020", "Panamera Turbo S:2021-2023", "Panamera 4 E-Hybrid:2020-2023", "Panamera 4S E-Hybrid:2021-2023", "Panamera Turbo S E-Hybrid:2020-2023"],
-  "Taycan": ["Taycan:2021-", "Taycan 4:2025-", "Taycan 4S:2020-", "Taycan GTS:2022-", "Taycan Turbo:2020-", "Taycan Turbo S:2020-", "Taycan Turbo GT:2025-", "Taycan Turbo GT Weissach:2025-"],
+  "Taycan": ["Taycan:2021-", "Taycan 4:2025-", "Taycan 4S:2020-", "Taycan GTS:2022-", "Taycan Turbo:2020-", "Taycan Turbo S:2020-"],
+  "Taycan Turbo GT": ["Turbo GT:2025-", "Turbo GT Weissach:2025-"],
   "Taycan Cross Turismo": ["Taycan 4 Cross Turismo:2021-", "Taycan 4S Cross Turismo:2021-", "Taycan Turbo Cross Turismo:2021-", "Taycan Turbo S Cross Turismo:2021-"],
   "Taycan Sport Turismo": ["Taycan GTS Sport Turismo:2022-"],
   "Macan": ["Macan:2020-2026", "Macan T:2023-2026", "Macan S:2020-2026", "Macan GTS:2020-2026", "Macan Turbo:2020-2021"],
@@ -75,20 +86,33 @@ const PORSCHE: Lineup = {
   "Cayenne": ["Cayenne:2020-", "Cayenne S:2020-", "Cayenne E-Hybrid:2020-", "Cayenne S E-Hybrid:2024-", "Cayenne GTS:2021-2023", "Cayenne GTS:2025-", "Cayenne Turbo:2020-2023", "Cayenne Turbo S E-Hybrid:2020-2023", "Cayenne Turbo E-Hybrid:2024-"],
   "Cayenne Coupe": [
     "Cayenne Coupe:2020-", "Cayenne S Coupe:2020-", "Cayenne E-Hybrid Coupe:2020-", "Cayenne S E-Hybrid Coupe:2024-", "Cayenne GTS Coupe:2021-2023", "Cayenne GTS Coupe:2025-",
-    "Cayenne Turbo Coupe:2020-2023", "Cayenne Turbo S E-Hybrid Coupe:2020-2023", "Cayenne Turbo GT:2022-2025", "Cayenne Turbo E-Hybrid Coupe:2024-",
+    "Cayenne Turbo Coupe:2020-2023", "Cayenne Turbo S E-Hybrid Coupe:2020-2023", "Cayenne Turbo E-Hybrid Coupe:2024-",
   ],
+  "Cayenne Turbo GT": ["Turbo GT:2022-2025"],
   "Cayenne Electric": ["Cayenne Electric:2026-", "Cayenne S Electric:2026-", "Cayenne Turbo Electric:2026-"],
 };
 
-const CATALOGS: { match: RegExp; label: string; lineup: Lineup }[] = [
+// GT / wide-body cars that used to be listed as a trim of the base model. They take different film
+// patterns (aero, vents, wings), so they are their own model with their own price. Loading the lineup
+// removes these old trim rows: [model, trim].
+const PORSCHE_MOVED: [string, string][] = [
+  ["718 Boxster", "Spyder"], ["718 Boxster", "Spyder RS"],
+  ["718 Cayman", "Cayman GT4"], ["718 Cayman", "Cayman GT4 RS"],
+  ["911", "Turbo"], ["911", "Turbo S"], ["911", "Turbo 50 Years"], ["911", "GT3"], ["911", "GT3 Touring"], ["911", "GT3 RS"], ["911", "S/T"], ["911", "Sport Classic"], ["911", "Dakar"],
+  ["911 Cabriolet", "Turbo"], ["911 Cabriolet", "Turbo S"],
+  ["Taycan", "Taycan Turbo GT"], ["Taycan", "Taycan Turbo GT Weissach"],
+  ["Cayenne Coupe", "Cayenne Turbo GT"],
+];
+
+const CATALOGS: { match: RegExp; label: string; lineup: Lineup; moved?: [string, string][] }[] = [
   { match: /merced/i, label: "Mercedes-Benz", lineup: MERCEDES },
-  { match: /porsche/i, label: "Porsche", lineup: PORSCHE },
+  { match: /porsche/i, label: "Porsche", lineup: PORSCHE, moved: PORSCHE_MOVED },
 ];
 
 export interface FactoryRow { year: number; model: string; trim: string; sort_order: number }
 
 // Every year/model/trim row of the factory lineup for this brand, or null when there isn't one.
-export function factoryCatalog(brand: string | null | undefined): { label: string; rows: FactoryRow[] } | null {
+export function factoryCatalog(brand: string | null | undefined): { label: string; rows: FactoryRow[]; moved: [string, string][]; models: string[] } | null {
   const c = CATALOGS.find((x) => x.match.test(brand || ""));
   if (!c) return null;
   const rows: FactoryRow[] = [];
@@ -108,5 +132,5 @@ export function factoryCatalog(brand: string | null | undefined): { label: strin
       }
     }
   });
-  return { label: c.label, rows };
+  return { label: c.label, rows, moved: c.moved || [], models: Object.keys(c.lineup) };
 }

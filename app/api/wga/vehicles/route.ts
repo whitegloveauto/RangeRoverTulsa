@@ -36,7 +36,13 @@ export async function GET() {
       const f = factoryCatalog(BRAND);
       if (!f) return null;
       const have = new Set((data || []).map((r) => `${r.year}|${r.model}|${r.trim}`));
-      return { label: f.label, total: f.rows.length, missing: f.rows.filter((r) => !have.has(`${r.year}|${r.model}|${r.trim}`)).length };
+      const moved = new Set(f.moved.map(([m, t]) => `${m}|${t}`));
+      return {
+        label: f.label,
+        total: f.rows.length,
+        missing: f.rows.filter((r) => !have.has(`${r.year}|${r.model}|${r.trim}`)).length,
+        moved: (data || []).filter((r) => moved.has(`${r.model}|${r.trim}`)).length,
+      };
     })(),
   });
 }
@@ -97,14 +103,26 @@ export async function POST(req: Request) {
     case "catalog.loadFactory": {
       const f = factoryCatalog(BRAND);
       if (!f) return fail(`There's no built-in lineup for ${BRAND} yet.`, 400);
-      const { data: existing } = await supabaseAdmin.from("dealer_vehicles").select("year, model, trim").eq("brand", BRAND).limit(20000);
+      const { data: existing } = await supabaseAdmin.from("dealer_vehicles").select("id, year, model, trim, sort_order").eq("brand", BRAND).limit(20000);
       const have = new Set((existing || []).map((r) => `${r.year}|${r.model}|${r.trim}`));
       const rows = f.rows.filter((r) => !have.has(`${r.year}|${r.model}|${r.trim}`)).map((r) => ({ brand: BRAND, ...r, active: true }));
       for (let i = 0; i < rows.length; i += 400) {
         const { error } = await supabaseAdmin.from("dealer_vehicles").insert(rows.slice(i, i + 400));
         if (error) return fail(`Could not load the lineup (${i} of ${rows.length} added).`);
       }
-      return NextResponse.json({ ok: true, added: rows.length });
+      // trims that became their own model (GT3, GT4 RS, Turbo …): drop the old trim rows
+      const movedKeys = new Set(f.moved.map(([m, t]) => `${m}|${t}`));
+      const stale = (existing || []).filter((r) => movedKeys.has(`${r.model}|${r.trim}`)).map((r) => r.id);
+      for (let i = 0; i < stale.length; i += 100) {
+        const { error } = await supabaseAdmin.from("dealer_vehicles").delete().in("id", stale.slice(i, i + 100));
+        if (error) return fail("The new models were added, but the old trim rows could not be removed.");
+      }
+      // keep the factory order (new models slot in next to their family)
+      const order = new Map(f.models.map((m, i) => [m, (i + 1) * 10]));
+      const current = new Map<string, number>();
+      for (const r of existing || []) if (!current.has(r.model)) current.set(r.model, r.sort_order);
+      await Promise.all(Array.from(order).filter(([m, so]) => current.has(m) && current.get(m) !== so).map(([m, so]) => supabaseAdmin.from("dealer_vehicles").update({ sort_order: so }).eq("brand", BRAND).eq("model", m)));
+      return NextResponse.json({ ok: true, added: rows.length, removed: stale.length });
     }
     case "model.copyYear": {
       const fromYear = Number(b.fromYear);

@@ -29,7 +29,7 @@ export default function WgaVehiclesPage() {
   const [newModel, setNewModel] = useState({ model: "", trim: "" });
   const [dealer, setDealer] = useState<{ id: string; name: string; short_name: string; brand: string } | null>(null);
   const [sharedWith, setSharedWith] = useState<string[]>([]);
-  const [factory, setFactory] = useState<{ label: string; total: number; missing: number } | null>(null);
+  const [factory, setFactory] = useState<{ label: string; total: number; missing: number; moved?: number } | null>(null);
   const [ctx, setCtx] = useState<{ dealerships: any[]; selected: any } | null>(null);
 
   async function load() {
@@ -107,11 +107,11 @@ export default function WgaVehiclesPage() {
           ) : null}
           {msg ? <div className="notice warn">{msg}</div> : null}
 
-          {factory && factory.missing > 0 ? (
+          {factory && (factory.missing > 0 || (factory.moved || 0) > 0) ? (
             <div className="card" style={{ display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
               <div style={{ fontSize: 13, lineHeight: 1.55, maxWidth: 640 }}>
                 <b>{factory.label} 2020–2027 lineup is ready to load.</b>
-                <div style={{ color: "var(--text-3)" }}>{factory.missing === factory.total ? `Adds every model and trim (${factory.total} rows).` : `${factory.missing} of ${factory.total} model/trim rows aren't in this catalog yet.`} Nothing already here is changed or removed.</div>
+                <div style={{ color: "var(--text-3)" }}>{factory.missing === factory.total ? `Adds every model and trim (${factory.total} rows).` : `${factory.missing} of ${factory.total} model/trim rows aren't in this catalog yet.`} {factory.moved ? ` ${factory.moved} old trim rows (GT3, GT4 RS, Turbo and similar) move out to their own models so they can be priced separately.` : " Nothing already here is changed or removed."}</div>
               </div>
               <button
                 className="btn-primary btn-sm"
@@ -120,7 +120,7 @@ export default function WgaVehiclesPage() {
                   const d = await act({ action: "catalog.loadFactory" });
                   if (d) {
                     setYear(2027);
-                    setMsg(`${d.added} model/trim rows added.`);
+                    setMsg(`${d.added} model/trim rows added${d.removed ? `, ${d.removed} old trim rows moved out to their own models` : ""}.`);
                   }
                 }}
               >
