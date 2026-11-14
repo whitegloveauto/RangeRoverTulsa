@@ -496,10 +496,7 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .drawer { padding-top: calc(22px + env(safe-area-inset-top)); padding-bottom: calc(30px + env(safe-area-inset-bottom)); }
   main { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 }
-@media (display-mode: standalone) {
-  body { -webkit-user-select: none; user-select: none; }
-  input, textarea { -webkit-user-select: text; user-select: text; }
-}
+/* (no user-select:none on the installed app — in Safari/WebKit it makes text boxes drop focus) */
 
 /* ============ WGA side on phones ============ */
 .pkg-chips { display: none; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
