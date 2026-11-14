@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 // GET /api/auth/handoff?t=… — finishes "View as dealer" on the dealership's own address:
 // trades the 60-second hand-off token for a dealer cookie here, then opens the portal.
+// (The redirect carries its own query so the CDN does not copy ?t=… onto the portal address.)
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
@@ -13,5 +14,5 @@ export async function GET(req: Request) {
   const claims = await readHandoff(url.searchParams.get("t") || "");
   if (!claims) return NextResponse.redirect(new URL("/?handoff=expired", base));
   setSessionCookie(await createSession(claims), "dealer");
-  return NextResponse.redirect(new URL("/portal/vehicle", base));
+  return NextResponse.redirect(new URL("/portal/vehicle?view=dealer", base));
 }
