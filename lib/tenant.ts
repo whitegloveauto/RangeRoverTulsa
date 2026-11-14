@@ -51,10 +51,16 @@ export const tenantByHost = cache(async (host: string | null): Promise<Tenant | 
   const key = (host || "").toLowerCase().split(":")[0];
   const hit = tenantMemo.get(key);
   if (hit && Date.now() - hit.at < TENANT_TTL) return hit.t;
-  const t = loadTenantByHost(key).catch((e) => {
-    tenantMemo.delete(key);
-    throw e;
-  });
+  const t = loadTenantByHost(key).then(
+    (v) => {
+      if (!v) tenantMemo.delete(key); // never remember "no dealership here" — a new address or a database blip must recover at once
+      return v;
+    },
+    (e) => {
+      tenantMemo.delete(key);
+      throw e;
+    }
+  );
   tenantMemo.set(key, { at: Date.now(), t });
   return t;
 });
