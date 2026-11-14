@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { requireWgaPerm, createSession, createHandoff, setSessionCookie, clearSessionCookie } from "@/lib/session";
 import { hostOf, isLocalHost } from "@/lib/hosts";
 import type { SessionClaims } from "@/lib/types";
+import { selectedDealership } from "@/lib/wgaContext";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,9 @@ export async function POST(req: Request) {
   }
   const role: "admin" | "user" = b.role === "user" ? "user" : "admin";
   let q = supabaseAdmin.from("dealer_dealerships").select("id, slug, name, brand, location, hide_cost_from_users, hostnames").eq("active", true);
-  q = b.dealership_id ? q.eq("id", b.dealership_id) : q.order("name").limit(1);
+  // No dealership named (header button): open the one picked in the header switcher.
+  const pickId = b.dealership_id || (await selectedDealership().catch(() => null))?.id;
+  q = pickId ? q.eq("id", pickId) : q.order("name").limit(1);
   const { data } = await q;
   const d = data?.[0];
   if (!d) return NextResponse.json({ error: "Dealership not found." }, { status: 404 });
@@ -43,9 +46,6 @@ export async function POST(req: Request) {
   const here = hostOf(req.headers.get("x-forwarded-host") || req.headers.get("host"));
   const site = ((d.hostnames as string[] | null) || []).map(hostOf).find((h) => h && !isLocalHost(h));
   if (site && site !== here && !isLocalHost(here)) {
-    // The dealership's address has to be live (added in Netlify + DNS) before we can send anyone there.
-    const live = await fetch(`https://${site}/dealer-manifest`, { signal: AbortSignal.timeout(3500), redirect: "manual" }).then((r) => r.ok, () => false);
-    if (!live) return NextResponse.json({ error: `${site} isn't live yet. Add it to the site in Netlify (Domain management → Add a domain alias) and in Cloudflare DNS (CNAME → rangerovertulsa.netlify.app, DNS only), then try again.` }, { status: 409 });
     const t = await createHandoff(claims);
     return NextResponse.json({ ok: true, next: `https://${site}/api/auth/handoff?t=${encodeURIComponent(t)}`, dealership: d.name, role });
   }

@@ -49,13 +49,16 @@ export default function WgaDealershipsPage() {
 
   async function viewAs(dealership_id: string, role: "admin" | "user") {
     setMsg("");
+    const tab = window.open("", "_blank"); // opened right on the click — Safari blocks tabs opened after a wait
     const r = await fetch("/api/wga/view-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dealership_id, role }) });
-    const d = await r.json();
-    if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.next) {
+      tab?.close();
       setMsg(d.error || "Could not open dealer view.");
       return;
     }
-    window.open(d.next, "_blank");
+    if (tab) tab.location.href = d.next;
+    else window.location.href = d.next;
   }
 
   async function act(body: any) {
