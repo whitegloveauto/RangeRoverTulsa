@@ -10,9 +10,10 @@ import { AWAITING_PAYMENT, ORDER_STATUSES, normalizeStatus, workDone } from "@/l
 export const runtime = "nodejs";
 
 // Pipeline: new → in ShopMonkey → scheduled → in progress → awaiting payment → complete (= paid).
-// See lib/orderStatus.ts. In short: an order is moved to "awaiting payment" by hand when the work
-// is done (the dealership sees that as complete); ShopMonkey moves it to complete once the RO is
-// paid. "Invoiced" is a checkmark with a date (invoiced_on), not a step.
+// See lib/orderStatus.ts. In short: an order goes to "awaiting payment" when the work is done —
+// its RO is put in Completed in ShopMonkey, or someone moves it here (the dealership sees that as
+// complete); ShopMonkey moves it to complete once the RO is paid. "Invoiced" is a checkmark with
+// a date (invoiced_on), not a step.
 const ymd = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
 
 // GET /api/wga/orders?status=new  — all submitted orders across dealerships
@@ -66,8 +67,8 @@ export async function GET(req: Request) {
 }
 
 // PATCH /api/wga/orders — { id, status?, assigned_name?, scheduled_date?, internal_notes?, invoiced?, invoiced_on? }
-// invoiced (true / false): tick or clear the "invoiced" checkmark. It can be ticked at any point —
-//   usually while the car is still in the shop — and doesn't move the order.
+// invoiced (true / false): tick or clear the "invoiced" checkmark. It can be ticked at any point
+//   and doesn't move the order.
 // invoiced_on (YYYY-MM-DD): the invoice date (defaults to today); send it alone to correct the date.
 // Moving an order to awaiting payment or complete marks it invoiced (today) if it wasn't yet.
 export async function PATCH(req: Request) {
