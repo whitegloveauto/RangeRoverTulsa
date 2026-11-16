@@ -36,8 +36,8 @@ const windowText = (o: any) =>
   o.available_from || o.needed_by ? `${o.available_from ? `available ${day(o.available_from)}` : "available any time"} → ${o.needed_by ? `needed back ${day(o.needed_by)}` : "no deadline"}` : "no dates given";
 const todayYmd = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 
-// The "invoiced" checkmark on a vehicle. It can be ticked at any point — usually while the car is
-// still in the shop — and doesn't move the order. Once the order is awaiting payment it stays ticked.
+// The "invoiced" checkmark on a vehicle. It can be ticked at any point — before the car is in the
+// shop, or while it is — and doesn't move the order. Once the order is awaiting payment it stays ticked.
 function InvoicedCheck({ o, onPatch }: { o: any; onPatch: (b: any) => Promise<void> }) {
   // the tick shows at once; the saved value takes over when the save comes back
   const [pending, setPending] = useState<boolean | null>(null);
@@ -84,7 +84,7 @@ function BillingActions({ o, onPatch }: { o: any; onPatch: (b: any) => Promise<v
       ) : null}
       {o.invoiced_on && o.payment_label ? <span className="bill-exp">{o.payment_label}</span> : null}
       {working && !o.invoiced_on ? <button className="btn-ghost btn-sm" onClick={() => onPatch({ invoiced: true })}>Mark invoiced</button> : null}
-      {o.status === "in_progress" ? <button className="btn-primary btn-sm" title="The work is done. The dealership is told their car is ready; the order waits here until it's paid." onClick={() => onPatch({ status: "awaiting_payment" })}>Work done → Awaiting payment</button> : null}
+      {o.status === "in_progress" ? <button className="btn-primary btn-sm" title="The work is done. The dealership is told their car is ready; the order waits here until it's paid. Putting the RO in Completed in ShopMonkey does the same thing." onClick={() => onPatch({ status: "awaiting_payment" })}>Work done → Awaiting payment</button> : null}
       {awaiting ? <button className="btn-primary btn-sm" title="ShopMonkey does this on its own once the RO is paid" onClick={() => onPatch({ status: "complete" })}>Mark paid</button> : null}
       {awaiting ? <span className="bill-exp">Moves to Complete on its own when the RO is paid in ShopMonkey.</span> : null}
     </div>
@@ -141,7 +141,7 @@ export default function WgaOrdersPage() {
           <div className="stage-head">
             <div className="stage-eyebrow">DEALER ORDERS</div>
             <div className="stage-title">Work coming in.</div>
-            <div className="stage-sub">Orders submitted from the dealership portal. Each one moves through ShopMonkey → scheduled → in progress → awaiting payment → paid. Tick Invoiced on a vehicle when its invoice goes out — that can be while it&apos;s still in the shop. Paid orders land in Complete. Trim is on every order so patterns get cut for the right variant.</div>
+            <div className="stage-sub">Orders submitted from the dealership portal. Each one moves through ShopMonkey → scheduled → in progress → awaiting payment → paid. Tick Invoiced on a vehicle when its invoice goes out — that can be at any point, even before it&apos;s in the shop. Paid orders land in Complete. Trim is on every order so patterns get cut for the right variant.</div>
           </div>
           <div className="tabs">
             {[["open", "Open"], ["new", "New"], ["in_shopmonkey", "In ShopMonkey"], ["scheduled", "Scheduled"], ["in_progress", "In progress"], ["awaiting_payment", "Awaiting payment"], ["complete", "Complete"], ["all", "All"]].map(([k, l]) => (
@@ -151,7 +151,7 @@ export default function WgaOrdersPage() {
           {msg ? <div className="notice warn">{msg}</div> : null}
           {info ? <div className="notice ok">{info}</div> : null}
           <div className="sm-sync-bar">
-            <span>ShopMonkey moves orders for you every 10 minutes: on the calendar → Scheduled, In Progress on the board → In progress, and paid → Complete once an order is in Awaiting payment. Moving a finished car to Awaiting payment is done here by hand — that&apos;s when the dealership is told it&apos;s done.</span>
+            <span>ShopMonkey moves orders for you every 10 minutes: on the calendar → Scheduled, In Progress on the board → In progress, Completed on the board → Awaiting payment (that&apos;s when the dealership is told the car is done), and paid → Complete. Invoicing an RO in ShopMonkey moves nothing — tick Invoiced on the vehicle here.</span>
             <button className="btn-ghost btn-sm" disabled={!!sync?.busy} onClick={syncNow}>{sync?.busy ? "Checking ShopMonkey…" : "Sync ShopMonkey now"}</button>
           </div>
           {sync?.res && sync.open ? (
