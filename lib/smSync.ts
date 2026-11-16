@@ -2,7 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { emailOrderEvent } from "@/lib/dealerEmail";
 import { setShopMonkeyUnit } from "@/lib/shopmonkey";
 import { localDate, todayLocal } from "@/lib/billing";
-import { AWAITING_PAYMENT, normalizeStatus } from "@/lib/orderStatus";
+import { dealerStatus } from "@/lib/dealerAccess";
+import { AWAITING_PAYMENT, normalizeStatus, workDone } from "@/lib/orderStatus";
 
 // ShopMonkey → portal status sync. Reads each open order's RO through the existing
 // dealer-order-sm edge function (read-only "raw" GET probe — the ShopMonkey key never
@@ -13,15 +14,16 @@ import { AWAITING_PAYMENT, normalizeStatus } from "@/lib/orderStatus";
 //     Scheduled / Dispatched                                  → scheduled
 //     The scheduled date is always the FIRST day the RO is on the calendar — the day work starts.
 //     It follows the calendar if that appointment is moved; nobody types it in.
-//   • The board column is In Progress or anything after it (Quality Check, Invoices, Completed),
-//     or the RO has been invoiced                             → in progress
+//   • Board column In Progress (or Quality Check)             → in progress
+//   • Board column Completed — the shop says the work is done → awaiting payment
+//     (the dealership is told their car is ready; it can also be moved there by hand)
 //   • The RO is paid in full AND the order is in awaiting payment → complete
+//     (Completed and already paid goes straight to complete.)
 //
-// What it never does: move an order INTO awaiting payment. That step means "the work is done" and
-// is made by hand (WGA orders page / WGA Command app). ShopMonkey can't tell: the dealership is
-// usually invoiced while the car is still in the shop, and an invoiced RO sits in the Invoices
-// column either way. A paid RO whose order isn't in awaiting payment yet completes as soon as
-// someone moves it there.
+// What it deliberately ignores: the RO being turned into an invoice. White Glove invoices a
+// dealership whenever it suits — often before the car is even scheduled — so an invoice says
+// nothing about where the work is. "Invoiced" is a checkmark staff tick on the order
+// (dealer_quotes.invoiced_on), and the Invoices board column moves nothing.
 //
 // Also makes sure the dealer order number is in the ShopMonkey vehicle's Unit field.
 
@@ -63,15 +65,15 @@ async function workflowNames(token: string): Promise<Record<string, string>> {
 const COL_NOT_SCHEDULED = /\b(not|un)[ -]?scheduled\b/; // "Deal / Not Scheduled" is not a schedule
 const COL_SCHEDULED = /\b(scheduled?|appointment|appt|booked|confirmed|dispatch(ed)?)\b/;
 const COL_IN_PROGRESS = /\b(in progress|progress|in[ -]shop|working|wip|install(ing)?|started|in bay|qc|quality( check)?)\b/;
-const COL_AFTER_WORK = /\b(complete[d]?|done|ready|pick ?up|picked up|delivered|invoice[ds]?|closed)\b/;
+const COL_WORK_DONE = /\b(complete[d]?|done|ready|pick ?up|picked up|delivered|closed)\b/;
 
 export interface RoSignals {
   deleted: boolean;
   archived: boolean;
   paid: boolean; // paid in full
-  invoiced: boolean; // the RO has been turned into an invoice
-  started: boolean; // work is under way (or further along)
-  startedWhy: string;
+  invoicedOn: string | null; // Tulsa date the RO was turned into an invoice (never moves an order)
+  workDone: boolean; // the shop put it in a "completed" column
+  started: boolean; // work is under way (or done)
   scheduledColumn: boolean; // sitting in a "scheduled" board column
   hasAppointmentDates: boolean | null; // null = ShopMonkey didn't say
 }
@@ -83,14 +85,14 @@ export function readShopMonkey(o: any, wfName: string): RoSignals {
   const emptyTicket = Number.isFinite(total) && total <= 0; // a $0 ticket is never "paid"
   const paid = !emptyTicket && (o?.paid === true || (Number.isFinite(total) && Number.isFinite(paidCents) && paidCents >= total));
   const invoiced = String(o?.status || "") === "Invoice" || o?.invoiced === true;
-  const colStarted = COL_IN_PROGRESS.test(n) || COL_AFTER_WORK.test(n);
+  const workDone = COL_WORK_DONE.test(n);
   return {
     deleted: !!o?.deleted,
     archived: !!o?.archived,
     paid,
-    invoiced,
-    started: colStarted || invoiced || !!o?.completedDate || !!o?.completedAt,
-    startedWhy: colStarted ? `workflow “${wfName}”` : invoiced ? "RO invoiced" : "RO completed",
+    invoicedOn: invoiced && o?.invoicedDate ? localDate(String(o.invoicedDate)) : null,
+    workDone,
+    started: workDone || COL_IN_PROGRESS.test(n),
     scheduledColumn: !COL_NOT_SCHEDULED.test(n) && COL_SCHEDULED.test(n),
     hasAppointmentDates: Array.isArray(o?.appointmentDates) ? o.appointmentDates.length > 0 : null,
   };
@@ -112,13 +114,15 @@ export function decide(current: string, sm: RoSignals, wfName: string, apptDate:
   if (cur === AWAITING_PAYMENT) return sm.paid ? { status: "complete", why: "RO paid" } : { status: null, why: "waiting for payment in ShopMonkey" };
   if (sm.archived) return { status: null, why: "RO archived in ShopMonkey" };
   const rank = RANK[cur] ?? 99;
-  if (sm.started && rank < RANK.in_progress) return { status: "in_progress", why: sm.startedWhy };
+  const col = `workflow “${wfName}”`;
+  if (sm.workDone && rank < RANK.awaiting_payment) return sm.paid ? { status: "complete", why: `${col}, RO paid` } : { status: AWAITING_PAYMENT, why: col };
+  if (sm.started && rank < RANK.in_progress) return { status: "in_progress", why: col };
   if (rank < RANK.scheduled) {
     if (apptDate) return { status: "scheduled", why: `calendar: ${niceDay(apptDate)}` };
-    if (sm.scheduledColumn) return { status: "scheduled", why: `workflow “${wfName}”` };
+    if (sm.scheduledColumn) return { status: "scheduled", why: col };
   }
-  if (sm.paid) return { status: null, why: "RO paid — completes once it's moved to awaiting payment" };
-  return { status: null, why: wfName ? `workflow “${wfName}” (no change)` : "no workflow status" };
+  if (sm.paid && rank <= RANK.in_progress) return { status: null, why: "RO paid — moves on once the RO is in Completed" };
+  return { status: null, why: wfName ? `${col} (no change)` : "no workflow status" };
 }
 
 // Live calendar appointments linked to an RO (cancelled / deleted ones don't count).
@@ -149,7 +153,7 @@ export async function runShopMonkeySync(opts: { dry?: boolean; quoteIds?: string
 
   let q = supabaseAdmin
     .from("dealer_quotes")
-    .select("id, quote_number, status, sm_order_id, sm_order_number, scheduled_date")
+    .select("id, quote_number, status, sm_order_id, sm_order_number, scheduled_date, invoiced_on")
     .not("sm_order_id", "is", null)
     .in("status", OPEN)
     .order("sm_synced_at", { ascending: true, nullsFirst: true })
@@ -211,8 +215,20 @@ export async function runShopMonkeySync(opts: { dry?: boolean; quoteIds?: string
           const patch: any = { sm_synced_at: now, sm_sync_error: null };
           if (m.status) Object.assign(patch, { status: m.status, status_updated_at: now, updated_at: now });
           if (newDate) Object.assign(patch, { scheduled_date: newDate, updated_at: now });
+          // Awaiting payment / paid always carries an invoice date (statements run off it): the
+          // day ShopMonkey says the RO was invoiced, else today.
+          const stampInvoice = !!m.status && workDone(m.status) && !o.invoiced_on ? sm.invoicedOn || today : null;
+          if (stampInvoice) Object.assign(patch, { invoiced_on: stampInvoice, invoiced_by: "ShopMonkey sync" });
           await supabaseAdmin.from("dealer_quotes").update(patch).eq("id", o.id);
           const roTag = o.sm_order_number ? ` · RO ${o.sm_order_number}` : "";
+          if (stampInvoice) {
+            await supabaseAdmin.from("dealer_order_events").insert({
+              quote_id: o.id,
+              event_type: "invoiced",
+              actor_name: "ShopMonkey sync",
+              detail: `Invoiced ${stampInvoice} · set when ShopMonkey moved it to ${m.status === AWAITING_PAYMENT ? "awaiting payment" : "complete"}${roTag}`,
+            });
+          }
           if (m.status) {
             await supabaseAdmin.from("dealer_order_events").insert({
               quote_id: o.id,
@@ -222,11 +238,13 @@ export async function runShopMonkeySync(opts: { dry?: boolean; quoteIds?: string
               actor_name: "ShopMonkey sync",
               detail: `ShopMonkey ${m.why}${roTag}`,
             });
-            // Scheduled / in the shop is news to the dealership (not a "scheduled" for a day that
-            // has already gone by). Paid isn't: to them the order was complete the moment it went
-            // to awaiting payment.
-            const staleSchedule = m.status === "scheduled" && !!apptDate && apptDate < today;
-            if ((m.status === "scheduled" && !staleSchedule) || m.status === "in_progress") await emailOrderEvent(o.id, { kind: "status", status: m.status });
+            // Tell the dealership when what THEY see changes: scheduled, in the shop, complete
+            // (= awaiting payment on our side). Paid afterwards isn't news to them, and neither is
+            // a "scheduled" for a day that has already gone by.
+            const seenBefore = dealerStatus(cur);
+            const seenNow = dealerStatus(m.status);
+            const staleSchedule = seenNow === "scheduled" && !!apptDate && apptDate < today;
+            if (seenNow !== seenBefore && ["scheduled", "in_progress", "complete"].includes(seenNow) && !staleSchedule) await emailOrderEvent(o.id, { kind: "status", status: seenNow });
           } else if (newDate) {
             await supabaseAdmin.from("dealer_order_events").insert({
               quote_id: o.id,

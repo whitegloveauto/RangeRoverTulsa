@@ -2,12 +2,14 @@
 //
 //   new → in_shopmonkey → scheduled → in_progress → awaiting_payment → complete      (+ cancelled)
 //
-// awaiting_payment — the work is done and White Glove Auto is waiting to be paid. An order is
-//   moved there BY HAND (WGA orders page, or the WGA Command app). ShopMonkey then moves it to
-//   complete on its own once the RO is paid in full (lib/smSync.ts).
-// "Invoiced" is not a step. It is a checkmark on the order — dealer_quotes.invoiced_on (a Tulsa
-//   date) + invoiced_by — because the dealership is often invoiced while the car is still in the
-//   shop. Statements and "payment expected" run off that date.
+// awaiting_payment — the work is done and White Glove Auto is waiting to be paid. An order gets
+//   there when its RO is put in the Completed column in ShopMonkey, or by hand (WGA orders page,
+//   WGA Command app). ShopMonkey then moves it to complete once the RO is paid in full.
+//   (lib/smSync.ts has the rules.)
+// "Invoiced" is not a step. It is a checkmark staff tick on the order — dealer_quotes.invoiced_on
+//   (a Tulsa date) + invoiced_by — because the dealership is invoiced whenever it suits, often
+//   before the car is even in the shop. Statements and "payment expected" run off that date.
+//   Turning the RO into an invoice in ShopMonkey never moves an order.
 // The dealership sees neither: to them awaiting_payment is simply "complete" (lib/dealerAccess).
 //
 // "invoiced" as a STATUS is the old name of awaiting_payment (until Nov 2026). Nothing writes it
