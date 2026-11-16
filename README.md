@@ -90,7 +90,31 @@ emails are skipped and logged, and "Forgot password" falls back to "ask your adm
 ShopMonkey status sync runs from `netlify/functions/sm-sync.mjs` every 10 minutes
 (Netlify scheduled function). It calls `/api/internal/sm-sync` with a key derived
 from `SESSION_SECRET`, which reads each open RO through the `dealer-order-sm`
-edge function and moves portal status forward (scheduled → in progress → complete).
+edge function (read-only) and moves portal status forward. See "Order pipeline" below.
+
+## Order pipeline (White Glove side)
+
+`new → in_shopmonkey → scheduled → in_progress → awaiting_payment → complete` (+ `cancelled`).
+Defined in `lib/orderStatus.ts`; the sync rules are in `lib/smSync.ts`.
+
+| Step | How an order gets there |
+| --- | --- |
+| Scheduled | Automatic: the RO is on the ShopMonkey calendar (or its board column is Scheduled / Dispatched). `scheduled_date` is always the first day the RO is on the calendar and follows it if the appointment moves. "Deal / Not Scheduled" is not a schedule. |
+| In progress | Automatic: the RO's board column is In Progress (or Quality Check). |
+| Awaiting payment | Automatic: the RO's board column is Completed. Or by hand (WGA orders page, WGA Command app). The dealership sees this as "complete" and gets the ready-for-pickup email. |
+| Complete | Automatic: the RO is paid in full in ShopMonkey **and** the order is in awaiting payment (Completed and already paid goes straight here). "Mark paid" does it by hand. |
+
+**Invoiced is a checkmark, not a step**: `dealer_quotes.invoiced_on` (a Tulsa date) + `invoiced_by`.
+Staff tick it on the order when the invoice goes out. White Glove invoices a dealership whenever
+it suits, often before the car is even scheduled, so **turning the RO into an invoice in ShopMonkey
+never moves an order** (and the Invoices board column moves nothing). The date drives statements
+and "payment expected". An order reaching awaiting payment / complete gets one if it was still
+empty (the RO's invoice date, else that day). The dealership never sees it (`dealerQuote` /
+`dealerEvents` in `lib/dealerAccess.ts`). `invoiced` as a *status* was the old name of
+`awaiting_payment`; nothing writes it any more and every read treats it as `awaiting_payment`.
+
+The WGA Command iOS app writes `dealer_quotes` / `dealer_order_events` directly (Supabase RLS,
+`is_wga_dealer_staff()`), following the same rules. It does not send dealership emails.
 
 ### D · Custom domain
 
@@ -150,8 +174,8 @@ WHERE brand = 'Range Rover' AND tier = 'ESSENTIAL';
   Settings.
 - **Password reset** (`lib/reset.ts`): signed 1-hour links carrying a fingerprint of the
   current password state, so each link works once — no token table.
-- **Statements** (`lib/statements.ts`): orders completed in a month (Tulsa time) at WGA
-  cost with the dealership's `billing_terms`; CSV + print. WGA: /wga/statements.
+- **Statements** (`lib/statements.ts`): orders invoiced in the period (by `invoiced_on`, Tulsa
+  time) at WGA cost, on the dealership's payment schedule; CSV + print. WGA: /wga/statements.
   Dealer admins: Settings → Statements.
 - **Duplicate guard**: submitting an order for a VIN or stock # that already has a live
   order from the last 30 days asks for confirmation first.
