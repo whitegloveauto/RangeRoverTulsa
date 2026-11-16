@@ -99,17 +99,19 @@ Defined in `lib/orderStatus.ts`; the sync rules are in `lib/smSync.ts`.
 
 | Step | How an order gets there |
 | --- | --- |
-| Scheduled | Automatic: the RO is on the ShopMonkey calendar (or its board column is Scheduled / Dispatched). `scheduled_date` is always the first day the RO is on the calendar and follows it if the appointment moves. |
-| In progress | Automatic: the RO's board column is In Progress or later, or the RO has been invoiced. |
-| Awaiting payment | **By hand** (WGA orders page or the WGA Command app) when the work is done. The dealership sees this as "complete" and gets the ready-for-pickup email. ShopMonkey never moves an order here. |
-| Complete | Automatic: the RO is paid in full in ShopMonkey **and** the order is in awaiting payment. ("Mark paid" does it by hand.) |
+| Scheduled | Automatic: the RO is on the ShopMonkey calendar (or its board column is Scheduled / Dispatched). `scheduled_date` is always the first day the RO is on the calendar and follows it if the appointment moves. "Deal / Not Scheduled" is not a schedule. |
+| In progress | Automatic: the RO's board column is In Progress (or Quality Check). |
+| Awaiting payment | Automatic: the RO's board column is Completed. Or by hand (WGA orders page, WGA Command app). The dealership sees this as "complete" and gets the ready-for-pickup email. |
+| Complete | Automatic: the RO is paid in full in ShopMonkey **and** the order is in awaiting payment (Completed and already paid goes straight here). "Mark paid" does it by hand. |
 
 **Invoiced is a checkmark, not a step**: `dealer_quotes.invoiced_on` (a Tulsa date) + `invoiced_by`.
-It is ticked on the order when the invoice goes out — often while the car is still in the shop —
-and drives statements and "payment expected". Moving an order to awaiting payment / complete sets
-it to that day if it was still empty. The dealership never sees it (`dealerQuote` / `dealerEvents`
-in `lib/dealerAccess.ts`). `invoiced` as a *status* was the old name of `awaiting_payment`; nothing
-writes it any more and every read treats it as `awaiting_payment`.
+Staff tick it on the order when the invoice goes out. White Glove invoices a dealership whenever
+it suits, often before the car is even scheduled, so **turning the RO into an invoice in ShopMonkey
+never moves an order** (and the Invoices board column moves nothing). The date drives statements
+and "payment expected". An order reaching awaiting payment / complete gets one if it was still
+empty (the RO's invoice date, else that day). The dealership never sees it (`dealerQuote` /
+`dealerEvents` in `lib/dealerAccess.ts`). `invoiced` as a *status* was the old name of
+`awaiting_payment`; nothing writes it any more and every read treats it as `awaiting_payment`.
 
 The WGA Command iOS app writes `dealer_quotes` / `dealer_order_events` directly (Supabase RLS,
 `is_wga_dealer_staff()`), following the same rules. It does not send dealership emails.
