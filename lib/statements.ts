@@ -1,13 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase";
 
 import { addDays, getBillingTerms, localDate, localMidnightUtc, periodFor, recentPeriods, termsLabel } from "@/lib/billing";
+import { AWAITING_PAYMENT } from "@/lib/orderStatus";
 export { localDate } from "@/lib/billing";
 
 // Billing statement for a dealership: every order INVOICED in the period (Tulsa time), billed at
 // WGA cost. The period and due date follow the dealership's payment schedule (weekly: work invoiced
 // Mon–Sun is paid on the pay day the following week; every 2 weeks; monthly on receipt or Net N).
-// Invoice date = the most recent "→ invoiced" event; orders marked paid ("complete") without one
-// (older orders) use when they were completed. `paid` = the order has been marked paid.
+// Invoice date = dealer_quotes.invoiced_on, the "invoiced" checkmark — set when the invoice goes
+// out, which is often while the car is still in the shop, so an order can be on a statement before
+// it is finished. Orders finished before that date was kept on the order use when they were moved
+// to awaiting payment / complete. `paid` = the order is complete (paid).
 
 export interface StatementLine {
   id: string;
@@ -31,36 +34,47 @@ export async function buildStatement(dealershipId: string, periodKey: string | n
   const start = localMidnightUtc(period.from);
   const end = localMidnightUtc(addDays(period.to, 1));
 
-  // Candidates: completed orders whose status changed on/after the month start (completion can't be later than that).
-  const { data: qs } = await supabaseAdmin
-    .from("dealer_quotes")
-    .select("id, quote_number, status, sm_order_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at")
-    .eq("dealership_id", dealershipId)
-    .in("status", ["invoiced", "complete"])
-    .gte("status_updated_at", new Date(start - 86400000).toISOString())
-    .order("status_updated_at", { ascending: true })
-    .limit(1000);
+  // Candidates: (a) orders with an invoice date in the period — any step of the pipeline, not
+  // drafts or cancelled ones; (b) orders finished without an invoice date on them (older orders),
+  // dated by when they were finished.
+  const fields = "id, quote_number, status, sm_order_number, vehicle_vin, vehicle_year, vehicle_model, vehicle_trim, line_items, dealer_user_name, cost_total, retail_total, status_updated_at, submitted_at, invoiced_on";
+  const [{ data: dated }, { data: undated }] = await Promise.all([
+    supabaseAdmin
+      .from("dealer_quotes")
+      .select(fields)
+      .eq("dealership_id", dealershipId)
+      .not("status", "in", "(draft,cancelled)")
+      .gte("invoiced_on", period.from)
+      .lte("invoiced_on", period.to)
+      .order("invoiced_on", { ascending: true })
+      .limit(1000),
+    supabaseAdmin
+      .from("dealer_quotes")
+      .select(fields)
+      .eq("dealership_id", dealershipId)
+      .in("status", [AWAITING_PAYMENT, "invoiced", "complete"])
+      .is("invoiced_on", null)
+      .gte("status_updated_at", new Date(start - 86400000).toISOString())
+      .order("status_updated_at", { ascending: true })
+      .limit(1000),
+  ]);
 
-  const ids = (qs || []).map((q) => q.id);
-  const invAt: Record<string, string> = {};
-  const doneAt: Record<string, string> = {};
+  const ids = (undated || []).map((q) => q.id);
+  const doneAt: Record<string, string> = {}; // latest move to awaiting payment
+  const paidAt: Record<string, string> = {}; // latest move to complete
   for (let i = 0; i < ids.length; i += 150) {
-    const { data: ev } = await supabaseAdmin.from("dealer_order_events").select("quote_id, created_at, to_status").in("quote_id", ids.slice(i, i + 150)).in("to_status", ["invoiced", "complete"]);
+    const { data: ev } = await supabaseAdmin.from("dealer_order_events").select("quote_id, created_at, to_status").in("quote_id", ids.slice(i, i + 150)).in("to_status", [AWAITING_PAYMENT, "invoiced", "complete"]);
     for (const e of ev || []) {
-      const m = e.to_status === "invoiced" ? invAt : doneAt;
+      const m = e.to_status === "complete" ? paidAt : doneAt;
       if (!m[e.quote_id] || e.created_at > m[e.quote_id]) m[e.quote_id] = e.created_at;
     }
   }
 
   const lines: StatementLine[] = [];
-  for (const q of qs || []) {
-    const at = invAt[q.id] || doneAt[q.id] || q.status_updated_at || q.submitted_at;
-    if (!at) continue;
-    const t = new Date(at).getTime();
-    if (t < start || t >= end) continue;
+  const add = (q: any, invoicedYmd: string) =>
     lines.push({
       id: q.id,
-      completed: localDate(at),
+      completed: invoicedYmd,
       paid: q.status === "complete",
       quote_number: q.quote_number || "",
       ro: q.sm_order_number || "",
@@ -71,6 +85,13 @@ export async function buildStatement(dealershipId: string, periodKey: string | n
       amount: Number(q.cost_total || 0),
       retail: Number(q.retail_total || 0),
     });
+  for (const q of dated || []) add(q, String(q.invoiced_on));
+  for (const q of undated || []) {
+    const at = doneAt[q.id] || paidAt[q.id] || q.status_updated_at || q.submitted_at;
+    if (!at) continue;
+    const t = new Date(at).getTime();
+    if (t < start || t >= end) continue;
+    add(q, localDate(at));
   }
   lines.sort((a, b) => a.completed.localeCompare(b.completed) || a.quote_number.localeCompare(b.quote_number));
 

@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from "@/lib/kv";
+import { BILLING_EVENTS, workDone } from "@/lib/orderStatus";
 
 // What each person at a dealership can see and do. Dealer admins always have everything;
 // for everyone else it's the dealership's defaults (chosen in setup) plus any per-person changes.
@@ -61,11 +62,29 @@ export function cleanAccess(input: any): Partial<DealerAccess> {
 }
 
 
-// The dealership never sees WGA's billing steps: "invoiced" (work done, awaiting payment) reads as
-// complete on their side, and WGA marking it paid isn't a separate event for them.
-export const dealerStatus = (s: string) => (s === "invoiced" ? "complete" : s);
-export function dealerEvents<T extends { from_status?: string | null; to_status?: string | null }>(events: T[]): T[] {
+// The dealership never sees WGA's billing steps: "awaiting_payment" (work done, waiting to be
+// paid) reads as complete on their side, WGA marking it paid isn't a separate event for them, and
+// the "invoiced" checkmark (dealer_quotes.invoiced_on) stays on the White Glove side.
+export const dealerStatus = (s: string) => (workDone(s) ? "complete" : s);
+export function dealerEvents<T extends { event_type?: string | null; from_status?: string | null; to_status?: string | null; detail?: string | null }>(events: T[]): T[] {
   return events
-    .filter((e) => !(e.from_status === "invoiced" && e.to_status === "complete"))
-    .map((e) => ({ ...e, from_status: e.from_status ? dealerStatus(e.from_status) : e.from_status, to_status: e.to_status ? dealerStatus(e.to_status) : e.to_status }));
+    .filter((e) => !BILLING_EVENTS.includes(e.event_type || ""))
+    .map((e) => ({
+      ...e,
+      from_status: e.from_status ? dealerStatus(e.from_status) : e.from_status,
+      to_status: e.to_status ? dealerStatus(e.to_status) : e.to_status,
+      // a status change's note is written for White Glove ("awaiting payment", who moved it)
+      ...(e.event_type === "status_change" ? { detail: null } : {}),
+    }))
+    // awaiting payment → paid (or back): nothing changed for the dealership
+    .filter((e) => !(e.from_status === "complete" && e.to_status === "complete"));
+}
+
+// What the dealership's browser gets for one of its orders: their view of the status, and none of
+// White Glove Auto's own fields.
+const WGA_ONLY_FIELDS = ["internal_notes", "invoiced_on", "invoiced_by"];
+export function dealerQuote<T extends Record<string, any>>(q: T): T {
+  const out: Record<string, any> = { ...q, status: dealerStatus(q.status) };
+  for (const k of WGA_ONLY_FIELDS) delete out[k];
+  return out as T;
 }

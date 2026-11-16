@@ -43,7 +43,8 @@ export const DEALER_STATUS_LABEL: Record<string, string> = {
   in_shopmonkey: "Received",
   scheduled: "Scheduled",
   in_progress: "In the shop",
-  invoiced: "Complete",
+  awaiting_payment: "Complete", // the dealer's car is done; "awaiting payment" is White Glove's side of it
+  invoiced: "Complete", // old name of awaiting_payment
   complete: "Complete",
   cancelled: "Cancelled",
 };
