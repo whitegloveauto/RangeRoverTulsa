@@ -240,6 +240,7 @@ function OrderRow({ o, open, onToggle, onPatch }: { o: any; open: boolean; onTog
               {o.vehicle_vin ? <span>VIN <b className="vin">{o.vehicle_vin}</b></span> : null}
               {o.notes ? <span>Dealer notes <b>{o.notes}</b></span> : null}
               {o.sm_order_number ? <span onClick={(e) => e.stopPropagation()}>ShopMonkey <b>RO {o.sm_order_number}</b>{o.sm_synced_at ? ` · ${new Date(o.sm_synced_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""} <button className="link-btn" title="Writes this order number into the vehicle's Unit field in ShopMonkey" onClick={() => onPatch({ action: "sm_unit" })}>Put {o.quote_number} in Unit</button></span> : null}
+              {o.sm_check ? <span style={{ color: "#e0a56b" }}>Ticket check <b style={{ color: "#e0a56b" }}>{o.sm_check}</b></span> : null}
               {!o.sm_order_number ? (
                 <span onClick={(e) => e.stopPropagation()}>
                   ShopMonkey <b style={{ color: o.sm_sync_error ? "#e06b6b" : undefined }}>{o.sm_sync_error ? `failed — ${o.sm_sync_error}` : "no RO yet"}</b>{" "}

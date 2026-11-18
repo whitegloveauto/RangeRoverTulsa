@@ -63,6 +63,15 @@ export async function GET(req: Request) {
     o.payment_expected = exp?.date || null;
     o.payment_label = exp?.label || null;
   }
+  // Ticket-build checks: a recipe-built RO service that did not land on the dealer price (White Glove only).
+  const open = orders.filter((o) => o.sm_order_number && o.status !== "complete" && o.status !== "cancelled");
+  for (let i = 0; i < open.length; i += 150) {
+    const { data: ev } = await supabaseAdmin.from("dealer_order_events").select("quote_id, detail, created_at").eq("event_type", "shopmonkey_check").in("quote_id", open.slice(i, i + 150).map((o) => o.id)).order("created_at", { ascending: true });
+    for (const e of ev || []) {
+      const o = open.find((x) => x.id === e.quote_id);
+      if (o) o.sm_check = e.detail;
+    }
+  }
   return NextResponse.json({ orders, today: todayLocal() });
 }
 

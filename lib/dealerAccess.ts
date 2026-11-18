@@ -69,6 +69,7 @@ export const dealerStatus = (s: string) => (workDone(s) ? "complete" : s);
 export function dealerEvents<T extends { event_type?: string | null; from_status?: string | null; to_status?: string | null; detail?: string | null }>(events: T[]): T[] {
   return events
     .filter((e) => !BILLING_EVENTS.includes(e.event_type || ""))
+    .filter((e) => e.event_type !== "shopmonkey_check") // White Glove's internal ticket checks
     .map((e) => ({
       ...e,
       from_status: e.from_status ? dealerStatus(e.from_status) : e.from_status,

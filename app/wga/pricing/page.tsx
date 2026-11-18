@@ -5,6 +5,7 @@ import WgaHeader from "@/components/WgaHeader";
 import { hasPerm } from "@/lib/perms";
 import PriceGrid, { type GridChange } from "@/components/PriceGrid";
 import PacketEditor from "@/components/PacketEditor";
+import TicketBuilds from "@/components/TicketBuilds";
 import { useWgaSession } from "@/lib/useDealerSession";
 import type { PricingBook } from "@/lib/types";
 
@@ -110,6 +111,7 @@ export default function WgaPricingPage() {
                 onMove={(kind, id, dir) => svcAction({ action: kind === "service" ? "service.move" : "item.move", id, dir })}
               />
               <PacketEditor book={book} onService={(id, patch) => svcAction({ action: "service.update", id, ...patch })} onItem={(id, patch) => svcAction({ action: "item.update", id, ...patch })} />
+              <TicketBuilds book={book} />
             </>
           ) : null}
         </div>

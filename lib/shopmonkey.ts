@@ -79,3 +79,25 @@ export async function setShopMonkeyUnit(quoteId: string, opts: { force?: boolean
     return { ok: false, note: String(e?.message || e) };
   }
 }
+
+// ---- Shop labor rates (for the per-package ticket builds) -------------------------------------
+// The named, non-employee labor rates set up in ShopMonkey (Standard Labor, Ceramic Coating Labor…).
+// Employee pay rates live in the same list and are never returned. Kept for 10 minutes.
+let ratesMemo: { at: number; rates: { name: string; rate: number }[] } | null = null;
+export async function shopLaborRates(): Promise<{ name: string; rate: number }[]> {
+  if (ratesMemo && Date.now() - ratesMemo.at < 600_000) return ratesMemo.rates;
+  try {
+    const token = await smToken();
+    if (!token) return [];
+    const r = await smRaw(token, "GET", "/labor_rate");
+    const list: any[] = Array.isArray(r.data) ? r.data : [];
+    const rates = list
+      .filter((x) => x && !x.deleted && !x.isEmployeeRate && typeof x.valueCents === "number" && x.name)
+      .map((x) => ({ name: String(x.name), rate: x.valueCents / 100 }))
+      .sort((a, b) => (/standard/i.test(b.name) ? 1 : 0) - (/standard/i.test(a.name) ? 1 : 0) || a.name.localeCompare(b.name));
+    if (r.ok) ratesMemo = { at: Date.now(), rates };
+    return rates;
+  } catch {
+    return [];
+  }
+}
