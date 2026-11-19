@@ -104,8 +104,32 @@ const PORSCHE_MOVED: [string, string][] = [
   ["Cayenne Coupe", "Cayenne Turbo GT"],
 ];
 
+// AMG cars take different film patterns (bumpers, vents, flares) from the standard car, so each
+// body gets its own "AMG …" model with its own price: C-Class → C 300 …, AMG C-Class → AMG C 43, AMG C 63 S.
+// (Models that are already AMG-only — AMG GT … — are left alone. Maybach SL is its own model too.)
+function splitAmg(lineup: Lineup): { lineup: Lineup; moved: [string, string][] } {
+  const out: Lineup = {};
+  const moved: [string, string][] = [];
+  const trimOf = (spec: string) => spec.slice(0, spec.lastIndexOf(":"));
+  for (const [model, specs] of Object.entries(lineup)) {
+    if (/^(AMG|Maybach) /.test(model)) {
+      out[model] = specs;
+      continue;
+    }
+    const amg = specs.filter((x) => x.startsWith("AMG "));
+    const maybach = specs.filter((x) => x.startsWith("Maybach "));
+    const rest = specs.filter((x) => !amg.includes(x) && !maybach.includes(x));
+    if (rest.length) out[model] = rest;
+    if (amg.length) out[`AMG ${model}`] = amg;
+    if (maybach.length) out[`Maybach ${model}`] = maybach;
+    for (const x of [...amg, ...maybach]) if (!moved.some(([m, t]) => m === model && t === trimOf(x))) moved.push([model, trimOf(x)]);
+  }
+  return { lineup: out, moved };
+}
+const MERCEDES_SPLIT = splitAmg(MERCEDES);
+
 const CATALOGS: { match: RegExp; label: string; lineup: Lineup; moved?: [string, string][] }[] = [
-  { match: /merced/i, label: "Mercedes-Benz", lineup: MERCEDES },
+  { match: /merced/i, label: "Mercedes-Benz", lineup: MERCEDES_SPLIT.lineup, moved: MERCEDES_SPLIT.moved },
   { match: /porsche/i, label: "Porsche", lineup: PORSCHE, moved: PORSCHE_MOVED },
 ];
 

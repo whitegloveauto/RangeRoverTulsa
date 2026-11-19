@@ -40,9 +40,11 @@ export default function QuoteDocument({ data, status }: { data: PacketData; stat
   const { quote: q, dealership, lines, services, brand } = data;
   const dateStr = new Date(q.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   // Sections in catalog order; any line whose service was since renamed still gets its own section.
-  const known = new Map(services.map((s) => [s.name, s]));
-  const order = [...services.map((s) => s.name), ...Array.from(new Set(lines.map((l) => l.service))).filter((n) => !known.has(n))];
-  const sections = order.map((name) => ({ svc: known.get(name) || null, name, lines: lines.filter((l) => l.service === name) })).filter((g) => g.lines.length);
+  // (matched ignoring case and extra spaces, so tidying a service's name never orphans older quotes)
+  const key = (n: string) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const known = new Map(services.map((s) => [key(s.name), s]));
+  const order = [...services.map((s) => s.name), ...Array.from(new Map(lines.filter((l) => !known.has(key(l.service))).map((l) => [key(l.service), l.service])).values())];
+  const sections = order.map((name) => ({ svc: known.get(key(name)) || null, name, lines: lines.filter((l) => key(l.service) === key(name)) })).filter((g) => g.lines.length);
   const isOrder = status ? status !== "draft" : !!q.submitted_at;
 
   return (
